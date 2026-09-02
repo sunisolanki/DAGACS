@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: dagacs
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:dagacs}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.dagacs: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.web: WARN
+
+# JWT
+# DEVELOPMENT DEFAULT ONLY - MUST be overridden with a strong JWT_SECRET in production.
+jwt:
+  secret: ${JWT_SECRET:dagacs-dev-secret-change-me-in-production-32bytes-min}
+  expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+
+# API
+api:
+  version: v1
+  prefix: /api
+
+# Development seed users (BCrypt hashed at startup). Override in production.
+app:
+  seed:
+    admin-password: ${DAGACS_ADMIN_PASSWORD:Admin@123}
+    hod-password: ${DAGACS_HOD_PASSWORD:Hod@123}
+    teacher-password: ${DAGACS_TEACHER_PASSWORD:Teacher@123}
+    student-password: ${DAGACS_STUDENT_PASSWORD:Student@123}
+
