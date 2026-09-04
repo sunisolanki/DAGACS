@@ -5,7 +5,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sections")
+@Table(name = "sections",
+        uniqueConstraints = @UniqueConstraint(name = "uk_section_batch_name",
+                columnNames = {"batch_id", "name"}))
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Section {
 
@@ -27,7 +29,7 @@ public class Section {
     private Batch batch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subject_id", nullable = false)
+    @JoinColumn(name = "subject_id")
     private Subject subject;
 
     @Column(nullable = false)

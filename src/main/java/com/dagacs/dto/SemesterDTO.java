@@ -29,6 +29,9 @@ public class SemesterDTO {
     @NotNull(message = "Year is required")
     private Integer year;
 
+    @NotNull(message = "AcademicSession is required")
+    private Long academicSessionId;
+
     private AcademicSessionDTO academicSession;
 
     private java.util.List<SectionDTO> sections = new java.util.ArrayList<>();

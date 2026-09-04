@@ -1,6 +1,8 @@
 package com.dagacs.controller;
 
+import com.dagacs.dto.AcademicSessionDTO;
 import com.dagacs.dto.ProgramDTO;
+import com.dagacs.service.AcademicSessionService;
 import com.dagacs.service.ProgramService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -14,9 +16,12 @@ import java.util.List;
 public class ProgramController {
 
     private final ProgramService programService;
+    private final AcademicSessionService academicSessionService;
 
-    public ProgramController(ProgramService programService) {
+    public ProgramController(ProgramService programService,
+                             AcademicSessionService academicSessionService) {
         this.programService = programService;
+        this.academicSessionService = academicSessionService;
     }
 
     @PostMapping
@@ -60,5 +65,12 @@ public class ProgramController {
     public ResponseEntity<List<ProgramDTO>> getProgramsByDepartment(@PathVariable Long departmentId) {
         List<ProgramDTO> programs = programService.getProgramsByDepartment(departmentId);
         return ResponseEntity.ok(programs);
+    }
+
+    @GetMapping("/{programId}/academic-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<AcademicSessionDTO>> getSessionsByProgram(@PathVariable Long programId) {
+        List<AcademicSessionDTO> sessions = academicSessionService.getSessionsByProgram(programId);
+        return ResponseEntity.ok(sessions);
     }
 }

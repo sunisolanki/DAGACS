@@ -29,9 +29,12 @@ public class BatchDTO {
     @NotNull(message = "Year is required")
     private Integer year;
 
+    @NotNull(message = "AcademicSession is required")
+    private Long academicSessionId;
+
     private AcademicSessionDTO academicSession;
 
-    private String program; // program name string for simplicity
+    private String program; // program name string, derived from academic session's program for consistency
 
     @NotNull(message = "Max capacity is required")
     private Integer maxCapacity;

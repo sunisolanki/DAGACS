@@ -2,9 +2,11 @@ package com.dagacs.service;
 
 import com.dagacs.dto.DepartmentDTO;
 import com.dagacs.dto.ProgramDTO;
+import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.DepartmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +22,15 @@ public class ProgramService {
 
     private final ProgramRepository programRepository;
     private final DepartmentRepository departmentRepository;
+    private final AcademicSessionRepository academicSessionRepository;
 
     @Autowired
     public ProgramService(ProgramRepository programRepository,
-                          DepartmentRepository departmentRepository) {
+                          DepartmentRepository departmentRepository,
+                          AcademicSessionRepository academicSessionRepository) {
         this.programRepository = programRepository;
         this.departmentRepository = departmentRepository;
+        this.academicSessionRepository = academicSessionRepository;
     }
 
     public ProgramDTO saveProgram(ProgramDTO programDTO) {
@@ -57,12 +62,14 @@ public class ProgramService {
         return convertToDTO(program);
     }
 
+    @Transactional(readOnly = true)
     public List<ProgramDTO> getAllPrograms() {
         return programRepository.findAllByOrderByName().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public ProgramDTO getProgramById(Long id) {
         Program program = programRepository.findById(id)
                 .orElseThrow(() -> new AuthException("Program not found with ID: " + id, 404));
@@ -95,9 +102,19 @@ public class ProgramService {
         if (!programRepository.existsById(id)) {
             throw new AuthException("Program not found with ID: " + id, 404);
         }
+
+        Program program = programRepository.findById(id).orElseThrow();
+
+        List<AcademicSession> sessions = academicSessionRepository.findByProgram(program);
+        if (sessions != null && !sessions.isEmpty()) {
+            throw new AuthException("Cannot delete program. Academic session(s) exist: " +
+                    sessions.stream().map(AcademicSession::getName).collect(Collectors.joining(", ")), 409);
+        }
+
         programRepository.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
     public List<ProgramDTO> getProgramsByDepartment(Long departmentId) {
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new AuthException("Department not found with ID: " + departmentId, 404));

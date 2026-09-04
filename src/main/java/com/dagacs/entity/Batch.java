@@ -5,7 +5,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "batches")
+@Table(name = "batches",
+        uniqueConstraints = @UniqueConstraint(name = "uk_batch_session_name",
+                columnNames = {"academic_session_id", "name"}))
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Batch {
 

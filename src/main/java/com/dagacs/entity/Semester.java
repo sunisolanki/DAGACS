@@ -5,7 +5,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "semesters")
+@Table(name = "semesters",
+        uniqueConstraints = @UniqueConstraint(name = "uk_semester_session",
+                columnNames = {"name", "academic_session_id"}))
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Semester {
 

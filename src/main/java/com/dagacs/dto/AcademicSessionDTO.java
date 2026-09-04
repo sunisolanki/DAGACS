@@ -26,6 +26,10 @@ public class AcademicSessionDTO {
     @Size(max = 20, message = "Session code must not exceed 20 characters")
     private String code;
 
+    @NotBlank(message = "Semester is required")
+    @Size(max = 50, message = "Semester must not exceed 50 characters")
+    private String semester;
+
     @NotNull(message = "Duration in hours is required")
     private Integer durationHours;
 
@@ -37,6 +41,9 @@ public class AcademicSessionDTO {
 
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
+
+    @NotNull(message = "Program is required")
+    private Long programId;
 
     private ProgramDTO program;
 

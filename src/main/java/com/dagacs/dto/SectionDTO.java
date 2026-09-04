@@ -29,6 +29,9 @@ public class SectionDTO {
     @NotNull(message = "Max capacity is required")
     private Integer maxCapacity;
 
+    @NotNull(message = "Batch is required")
+    private Long batchId;
+
     private BatchDTO batch;
 
     private LocalDateTime createdAt;

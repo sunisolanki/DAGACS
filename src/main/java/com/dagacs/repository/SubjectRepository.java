@@ -15,4 +15,5 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     List<Subject> findAllByOrderByName();
     boolean existsByCode(String code);
     boolean existsByName(String name);
+    boolean existsByCodeAndIdNot(String code, Long id);
 }
