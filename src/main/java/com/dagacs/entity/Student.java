@@ -16,6 +16,15 @@ public class Student {
     @Column(nullable = false, unique = true)
     private String rollNumber;
 
+    /**
+     * Email of the login account that maps to this student profile. Used to resolve
+     * the authenticated student from the JWT principal (mirrors {@code teachers.email}).
+     * Nullable so that existing/unknown-profile students are not invalidated; never
+     * trusted from a client request.
+     */
+    @Column(name = "email")
+    private String email;
+
     @Column(nullable = false)
     private String name;
 

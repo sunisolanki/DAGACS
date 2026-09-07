@@ -1,0 +1,68 @@
+DETAILED PROJECT SCOPE OF WORK (SOW)
+Department Attendance Governance, Analytics and Compliance System (DAGACS)
+Platform: Cross-Platform Mobile Application
+(Flutter)
+Backend: Spring Boot (Java REST APIs)
+Database: MySQL 8.0 (Relational Database)
+Security: JWT & Role-Based Access Control
+(RBAC)
+1. PROJECT OVERVIEW & OBJECTIVE
+DAGACS ka primary goal educational institutes ke manual/semi-manual attendance process ko digitalize
+karna aur ek multi-tiered governance structure create karna hai. System ka main goal sirf daily attendance
+entry tak simit nahi hai, balki role-based access control, automated audit logging, real-time departmental
+analytics, aur compliance reports (PDF/Excel) ko centralize karna hai.
+2. SYSTEM ROLES & ACCESS MATRIX
+User
+Role
+Access Level
+Primary Responsibilities
+Admin
+System Level
+Master data configuration, User management, Department & Subject
+mapping.
+HOD
+Department
+Level
+Departmental analytics, Defaulter tracking, Governance oversight &
+Reports.
+Teacher
+Class Level
+Daily attendance recording, Record corrections (triggers Audit Log).
+Student
+Self Level
+Read-only view of own attendance percentages and lecture history.
+3. MODULE-WISE FUNCTIONAL SCOPE
+Module 1: Master Data Management (Admin)
+Department management (Add, Update, Activate/Deactivate).
+Academic Session setup (Academic Year, Semesters, Sections).
+Subject registry and department mapping.
+User account creation and CSV/Excel Batch Import for bulk student onboarding (60–120 students).
+Teacher-Subject-Section mapping configuration.
+Module 2: Attendance Marking & Governance (Teacher)
+Subject Isolation: Teachers see only their assigned classes/sections.
+Interactive toggle interface for Present/Absent recording.
+Attendance Update: Ability to update previously submitted attendance without requiring manual approval
+workflows.
+Module 3: Audit Trail & Governance Engine (System Core)
+Automated Audit Logging: Instant recording of every attendance status edit.
+Captured Audit Fields: Student ID, Subject, Previous Status, New Status, Updated By, and Exact Timestamp.
+HOD Audit View: Complete visibility for department heads for compliance and verification.
+Module 4: Analytics & Compliance (HOD)
+Multi-level analytics: Section-wise, Subject-wise, and Student-wise breakdown.
+Automated Defaulter Identification: Flags students falling below configured threshold (e.g., <75%).
+Time-series aggregation: Monthly, Quarterly, and Semester-wise attendance roll-ups.
+Module 5: Reporting & Export Engine
+Dynamic export of system reports into PDF and Excel (.xlsx) formats.
+Report Types: Monthly register, Defaulter list, Semester summary reports.
+4. EXPLICIT OUT-OF-SCOPE (EXCLUDED FEATURES)
+❌ Biometric / RFID Hardware Integration
+❌ AI / Facial Recognition Modules
+❌ GPS / Geofencing Verification
+❌ Parent / Guardian Portal Access
+5. KEY DELIVERABLES
+System Requirement Specification (SRS) Document
+Complete Database ER Diagram & MySQL Scripts
+Spring Boot Backend Source Code & REST API Collection
+Flutter Mobile Application Source Code (.apk Build)
+Research Evaluation Matrix (Manual vs DAGACS System)
+DAGACS Project Documentation • Generated for Academic Review

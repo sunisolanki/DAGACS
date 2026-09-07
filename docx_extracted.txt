@@ -1,0 +1,278 @@
+
+
+
+
+Department Attendance Governance, Analytics and Compliance System (DAGACS)
+Audited Scope of Work and Implementation Plan
+Corrected Final Version
+
+
+
+
+
+M.Tech Thesis Project
+Department of Computer Engineering
+Shri Govindram Seksaria Institute of Technology and Science, Indore
+July 2026
+
+Part A - Audit of the Existing System Concept
+This part audits the earlier DAGACS/DAMAS proposals against the corrected requirements. The audit covers role definitions, attendance workflow, data model, permissions, security, scalability, reporting, and research positioning. Every finding is followed by the correction applied in Part B.
+A.1 Headline Audit Findings
+Contradiction in the attendance workflow (critical).
+The earlier design combined a 24-hour submission window, a late-attendance request flow, an HOD approval workflow, an attendance lock after 48 hours, and late-attendance notifications. These features directly contradict the corrected requirement that a teacher may update attendance at any later time without HOD approval. All of these mechanisms are rejected and removed. The only correct mechanism for governing a later change is the automatic Audit Log.
+Role model inconsistency.
+Most proposal documents defined three roles (Admin, HOD, Teacher); only the full Scope of Work included Student. The corrected system defines exactly four roles, with Student as a read-only self-service role.
+Teacher-created student records were wrongly allowed.
+The earlier teacher module included 'Import Student List (if required)'. This leads to duplicate and inconsistent student masters. The corrected design keeps a single centralized student master maintained by the Admin (with Excel/CSV import); teachers only view students already assigned to their class.
+Compliance as a concept was undefined.
+The earlier 'Compliance Monitoring Engine' measured on-time submission against the 24-hour rule. With that rule removed, the term 'Compliance' had no meaning. In the corrected system, Compliance is redefined as three legitimate, low-complexity capabilities (see section B.1).
+Missing HOD department binding and data isolation.
+The design never enforced that an HOD belongs to exactly one department or that HOD, Teacher, and Student queries are scoped to their own data. The corrected system makes department/section/student scoping an explicit architectural and security requirement.
+Database weaknesses.
+No uniqueness constraints on teacher-subject-section assignment, no snapshot data in the audit log (roll number, student name, subject, section), ambiguous password storage, and a LEAVE status that the corrected requirements do not define.
+Research positioning relied on the rejected late-approval workflow.
+The claimed novelty was dominated by late-approval and submission-compliance features. With those removed, the research contributions are repositioned around the audit subsystem, role-based data isolation, governance workflows, and department analytics (see section B.13).
+A.2 Problem to Correction Table
+The following table lists every identified problem, why it is wrong, and the corrected approach.
+A.3 Detailed Audit by Category
+Requirement mistakes:
+Student self-service (view own attendance, monthly, semester, overall) was absent from proposals.
+HOD was not bound to a department; department association is a hard requirement.
+Teacher was given a student-import capability that must be removed.
+Admin role was overloaded with monitoring in some documents.
+Contradictions:
+Edit-within-24h, late-approval, lock-after-48h, and 'update later without approval' cannot coexist.
+Compliance-monitoring 'on-time' metrics cannot exist once the 24-hour rule is removed.
+LEAVE status is undefined by requirements yet present in the schema.
+Missing modules:
+Student module (login, own attendance, analytics, low-attendance alerts).
+Explicit HOD department scoping in the authorization model.
+Attendance coverage view (which classes have records).
+Consistent percentage calculation specification.
+Unnecessary modules:
+Late attendance workflow, approval, notifications, and attendance lock.
+Submission-timeliness compliance engine.
+WebSocket real-time refresh (future scope).
+Heavy FCM-based notification engine (reduced to low-attendance alerts).
+Weekly reports.
+Bad database decisions:
+No unique constraint on assignment table.
+Audit log lacked roll number and denormalized snapshots.
+Password storage unspecified ('encrypt').
+Vague user-to-profile linkage.
+No explicit indexes on attendance (subject_allocation_id, date) and audit_log (attendance_id).
+Bad role permissions:
+Admin analytics overlap with HOD.
+Teacher scope not enforced at the service layer.
+Student write-prevention and row isolation not enforced by design.
+HOD read-only semantics for master data not explicit.
+Security problems:
+Row-level data isolation depends only on JWT role claims, which is insufficient.
+Client-supplied IDs could allow cross-user access unless service layer re-scopes.
+Passwords must be hashed with BCrypt, not encrypted.
+Audit log must be append-only with no update/delete APIs.
+Scalability problems:
+Department-scale data; needs indexes, pagination, and optional archival.
+No pagination strategy defined for student/attendance lists.
+Workflow problems:
+'Pending attendance' cannot be computed without a timetable; no timetable is defined.
+Approval-based workflow added latency and complexity that requirements reject.
+Reporting problems:
+Percentage formula undefined and could be computed inconsistently.
+Weekly report not required; PDF export needs justification (official records).
+Low-attendance and coverage reports were missing.
+Research weaknesses:
+Novelty over-depended on the rejected approval workflow.
+No evaluation plan beyond comparison of features.
+Adding AI/face/QR would inflate scope without solving the stated problem.
+
+Part B - Corrected Final System (Clean Final Version)
+B.1 System Name and Meaning of Compliance
+The title 'Department Attendance Governance, Analytics and Compliance System (DAGACS)' is accurate provided the term Compliance is explicitly scoped. With the late-approval mechanisms removed, Compliance is defined as the following three legitimate capabilities, none of which adds an approval workflow:
+These three capabilities give the word 'Compliance' a real, verifiable meaning without reintroducing any rejected feature.
+B.2 Corrected System Architecture
+The system remains a three-tier architecture. This is appropriate for the problem.
+Functional modules:
+Authentication & Authorization (JWT + RBAC + row-level scoping)
+Master Data Management (Admin): department, academic year, semester, section, subject, teacher, student, user
+Teaching Assignment: teacher -> subject -> section -> session
+Attendance Management: mark, view, update (update always creates audit entry)
+Audit Subsystem: immutable append-only change log
+Student Self-Service: view own attendance, percentages, history
+HOD Governance: department dashboard, analytics, low-attendance, coverage, audit view
+Reporting: Excel (required) and PDF (justified optional)
+Notification: minimal in-app + email for low-attendance alerts
+B.2.1 Technology Evaluation
+B.3 Corrected Role-wise Scope of Work
+ADMIN
+Maintains academic master data. Admin never takes attendance.
+Manage departments.
+Manage academic years/sessions.
+Manage semesters.
+Manage sections.
+Manage subjects.
+Manage teachers (profiles; mark one teacher as HOD of a department).
+Manage students (centralized master).
+Import student data via Excel/CSV.
+Manage user accounts and reset passwords.
+Assign teachers to subjects and to sections (teaching assignment).
+Manage user roles (Admin, HOD, Teacher, Student).
+Activate/deactivate accounts.
+HOD
+Governs one department (scoped to their dept_id). Read-only regarding attendance data.
+View department dashboard with analytics.
+View all sections/classes under the department.
+View subject-wise attendance.
+View section-wise attendance.
+View student-wise attendance.
+View teacher/subject attendance status (recording coverage).
+Identify students with low attendance (below threshold).
+View monthly, quarterly, and semester attendance.
+Export reports to Excel (and PDF if justified).
+View the Attendance Audit Log (who, when, old/new value, reason).
+TEACHER
+Records attendance only for their assigned subjects and sections.
+Login securely.
+See only assigned subjects.
+See only assigned sections.
+See students belonging to assigned classes.
+Mark daily attendance (Present/Absent).
+Submit/save attendance for a lecture/class.
+Update/correct attendance later, without HOD approval.
+Every update automatically creates an Audit Log entry.
+View relevant attendance history.
+Download subject-wise attendance (self-scope).
+STUDENT
+Read-only access to their own attendance only.
+Login.
+View own attendance only.
+Subject-wise attendance.
+Overall/total attendance percentage.
+Monthly attendance.
+Semester attendance.
+Attendance history.
+Receive low-attendance alerts.
+Permission matrix
+Scope enforcement summary: Admin manages all master data; HOD is restricted to their department; Teacher is restricted to their teaching assignments; Student is restricted to their own record. No role can exceed these boundaries even if it knows an identifier from another scope.
+B.4 Complete Functional Workflows
+B.4.1 Academic setup workflow (Admin)
+Step 1: Admin creates the department and marks one teacher as its HOD.
+Step 2: Admin creates the academic session (academic year).
+Step 3: Admin creates semesters under the session.
+Step 4: Admin creates sections under each semester (department-scoped).
+Step 5: Admin creates subjects and links them to semesters.
+Step 6: Admin registers teachers and creates their login accounts.
+Step 7: Admin imports students from Excel/CSV into the centralized master and assigns them to sections.
+Step 8: Admin creates teaching assignments: teacher -> subject -> section -> session.
+B.4.2 Attendance marking workflow (Teacher)
+Step 1: Teacher logs in; the system loads only the teacher's teaching assignments.
+Step 2: Teacher selects assigned subject and section.
+Step 3: System displays the student list for that section.
+Step 4: Teacher marks each student Present or Absent.
+Step 5: Teacher submits attendance; records are stored with the date and teacher identity.
+Step 6: If attendance already exists for that student/subject/date, the system returns a clear 'already recorded' message.
+B.4.3 Attendance update workflow (Teacher, auto-audit)
+Step 1: Teacher opens a previously recorded attendance for an assigned class.
+Step 2: Teacher changes a status, e.g. Absent -> Present.
+Step 3: The system updates the attendance record.
+Step 4: The Audit subsystem automatically inserts an audit entry capturing old value, new value, student, roll number, subject, section, attendance date, changed-by, date/time, and optional reason.
+Step 5: No approval workflow is triggered.
+B.4.4 Student self-service workflow (Student, read-only)
+Step 1: Student logs in.
+Step 2: System loads only the student's own records from their section.
+Step 3: Student views subject-wise attendance, overall percentage, monthly, semester, and history.
+Step 4: Student receives low-attendance alerts when below the threshold.
+Step 5: No write access to any attendance record.
+B.4.5 HOD governance workflow (HOD, department-scoped)
+Step 1: HOD logs in; the system loads only their department.
+Step 2: HOD views the dashboard: overall attendance %, section comparison, subject comparison, low-attendance list, coverage gaps, recent audit activity.
+Step 3: HOD drills into section-wise, subject-wise, and student-wise attendance.
+Step 4: HOD reviews the Attendance Audit Log.
+Step 5: HOD exports monthly, quarterly, semester, or low-attendance reports to Excel (or PDF).
+B.4.6 Attendance percentage rule (single source of truth)
+Percentage = (number of PRESENT records / total recorded records) x 100, computed only from recorded attendance rows. Days with no record are not counted because the system has no timetable. The same formula is used by Student view, HOD analytics, and reports so that every view is consistent.
+B.5 Database Entities and Relationships
+Important relationships and constraints:
+teacher.dept_id -> department.id; HOD is a teacher with is_hod = true in exactly one department.
+section belongs to one department and one semester.
+student.section_id -> section.id; a student is never duplicated (unique roll_no).
+teaching_assignment prevents duplicate teacher-subject-section-session rows.
+attendance.unique prevents duplicate attendance for the same student in the same class on the same date.
+audit_log is append-only; no update or delete endpoint exists.
+Indexes: attendance(teaching_assignment_id, attendance_date), attendance(student_id), audit_log(attendance_id), audit_log(changed_by).
+Password storage: BCrypt hash; never plain text, never reversible encryption.
+Audit log example (as required):
+B.6 API / Module Implementation Plan
+Base path /api/v1. Response envelope: { success, message, data, timestamp }. JWT in Authorization: Bearer <token>. Pagination on list endpoints.
+B.7 Realistic Implementation Roadmap
+Agile development with 2-week sprints. The roadmap is simpler than the earlier plan because the late-approval workflow and second frontend were removed.
+Total functional scope is deliberately contained: one frontend, no approval workflows, no real-time infrastructure, no external hardware. This is realistic for an M.Tech timeline while remaining architecturally complete.
+B.8 Functional and Non-Functional Requirements
+Functional requirements (by module):
+Authentication: login, logout, change password, role-based redirection; accounts created by Admin.
+Master data: CRUD for department, session, semester, section, subject, teacher, student; deactivate/activate accounts.
+Student import: Excel/CSV upload; validation; duplicate detection by roll number; import summary report.
+Teaching assignment: create/remove teacher-subject-section-session; enforce uniqueness; list assignments per teacher.
+Attendance: mark Present/Absent for a class on a date; block duplicate per student/class/date; update status later.
+Audit: automatic immutable log on every update with old/new value, student, roll no, subject, section, date, user, timestamp, optional reason.
+Student self-service: own subject-wise %, overall %, monthly, semester, history; no write access.
+HOD governance: department dashboard; section/subject/student analytics; low-attendance list; coverage view; audit log view.
+Reports: daily-lecture, monthly, quarterly, semester, low-attendance, coverage; Excel export required, PDF justified.
+Notifications: in-app + email for low-attendance alerts; mark-as-read.
+Non-functional requirements:
+Security: BCrypt password hashing; JWT; method-level RBAC; row-level scoping in the service layer; DTOs; input validation; append-only audit.
+Data isolation: teacher, student, and HOD can never read or write outside their scope, even with forged identifiers.
+Performance: department-scale (a few thousand students, < 100 teachers); list endpoints paginated; response time < 2s for dashboard/report generation.
+Auditability: every attendance change traceable; audit records cannot be modified or deleted by any role.
+Reliability: ACID transactions for attendance + audit write; consistent percentage computation.
+Usability: simple role-specific UI; < 3 clicks to mark a class; clear import error messages.
+Maintainability: layered Spring Boot services, Swagger/OpenAPI, documented code, 80%+ test coverage target.
+Scalability (future-ready): normalized schema and indexes allow multi-department extension without redesign.
+B.9 Scope Separation
+Current scope (this M.Tech deliverable):
+Four roles with strict separation (Admin, HOD, Teacher, Student).
+Centralized academic master data with Excel/CSV student import.
+Attendance marking, viewing, and unrestricted later correction by the teacher.
+Automatic, immutable attendance audit log.
+Student read-only self-service and low-attendance alerts.
+HOD department-scoped dashboard, analytics, coverage, and audit viewing.
+Excel and PDF report export.
+Future scope (genuinely relevant, not artificial):
+Separate Flutter mobile app for Teacher/Student (responsive web covers current needs).
+Timetable/period scheduling, enabling precise 'classes not recorded' detection and per-lecture attendance.
+Real-time dashboard refresh via WebSocket.
+Push notifications via FCM.
+Multiple departments and a super-admin across departments.
+Leave/holiday calendar and LEAVE status if the institution requires it.
+PDF report branding per institution.
+Out of scope (explicitly rejected for this project):
+24-hour submission deadline and late-attendance workflow.
+HOD approval for normal attendance updates.
+Late-attendance notifications.
+Face recognition, GPS/geofencing, QR attendance, RFID, biometrics.
+Parent module.
+Student editing of attendance.
+AI/ML attendance prediction.
+Generic ERP features beyond the defined scope (payroll, grading, library, finance, etc.).
+B.10 Research Positioning and Evaluation (M.Tech)
+Research contributions (honest, no artificial AI):
+Attendance Governance Framework (AGF): a role-governed lifecycle for attendance data (record, correct, audit, analyze).
+An immutable, self-contained audit subsystem design for attendance changes, including denormalized snapshots that survive master-data edits.
+Multi-level data isolation (RBAC + row-level scoping) applied to academic data, with explicit security evaluation.
+A department analytics model: consistent percentage computation, threshold/eligibility monitoring, and coverage analytics.
+An automated reporting pipeline (Excel/PDF) driven by the same query layer used by dashboards.
+Evaluation plan:
+Correctness: compare computed percentages and low-attendance lists against manual calculation on a seeded dataset.
+Audit completeness: verify that 100% of programmatically performed updates produce correct audit entries.
+Data isolation: automated tests confirming cross-role access attempts are rejected (teacher/student/HOD).
+Usability: task-based evaluation with real teachers and HOD (e.g., System Usability Scale).
+Performance: attendance marking time, report generation time, and dashboard load time on department-scale data.
+Comparison: manual register vs DAGACS on time-to-record and time-to-report.
+B.11 How to Use This Document
+Scope of Work: Parts A and B.3 define the contract exactly.
+Software Requirements Specification: B.8 (functional and non-functional requirements) is the requirements baseline.
+System Architecture: B.2, B.5 (entities), and B.6 (API) are the design baseline.
+Implementation Plan: B.7 is the phased roadmap; A.2 records every change from the earlier plan.
+M.Tech Documentation: B.10 provides research contributions and an evaluation plan; A.3 supports the literature gap discussion.
+
+- End of Corrected SOW and Implementation Plan -

@@ -77,6 +77,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "Validation failed", "message", "Request constraint violation"));
     }
 
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidDateRange(InvalidDateRangeException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Bad Request", "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneric(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

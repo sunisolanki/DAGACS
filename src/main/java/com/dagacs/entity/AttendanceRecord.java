@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "attendance_records")
+@Table(name = "attendance_records",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_attendance_student_session",
+                columnNames = {"session_id", "student_id"}))
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AttendanceRecord {
 
@@ -14,16 +17,32 @@ public class AttendanceRecord {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id", nullable = false)
+    private AttendanceSession session;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
+    /**
+     * Denormalized snapshot of the session's subject, kept synchronized with the
+     * session. Never accepted independently from the client.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", nullable = false)
     private Subject subject;
 
+    /**
+     * Denormalized snapshot of the session's section, kept synchronized with the
+     * session. Never accepted independently from the client.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id", nullable = false)
     private Section section;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "marked_by", nullable = false)
+    private Teacher markedBy;
 
     @Column(nullable = false)
     private String status;

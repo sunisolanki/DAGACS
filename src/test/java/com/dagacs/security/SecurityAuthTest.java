@@ -96,4 +96,38 @@ class SecurityAuthTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void studentAttendanceEndpoint_withValidStudentToken_returns401_whenNoProfileLinked() throws Exception {
+        // A valid STUDENT token passes authentication and the /api/student/** matcher, but the
+        // students table is empty (no seeded student profile), so identity cannot be resolved
+        // and the endpoint returns 401. This mirrors teacher identity resolution semantics.
+        String token = loginToken("student@dagacs.local", "Student@123");
+        mockMvc.perform(get("/api/student/attendance/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void studentAttendanceEndpoint_withValidAdminToken_returns403() throws Exception {
+        // An authenticated, non-STUDENT principal is rejected by the STUDENT role requirement
+        // before identity resolution, so ADMIN sees 403 (not 401).
+        String token = loginToken("admin@dagacs.local", "Admin@123");
+        mockMvc.perform(get("/api/student/attendance/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void studentAttendanceEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/my"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void studentAttendanceEndpoint_withForgedToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/my")
+                        .header("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdHVkZW50QGRhZ2Fjcy5sb2NhbCIsInJvbGVzIjoiU1RVREVOVCJ9.forged"))
+                .andExpect(status().isUnauthorized());
+    }
 }

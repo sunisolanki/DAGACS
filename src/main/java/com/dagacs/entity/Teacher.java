@@ -16,6 +16,23 @@ public class Teacher {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /**
+     * Department the teacher belongs to (M6.1 HOD binding). Nullable so that
+     * existing teachers without a department association remain valid.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+    /**
+     * HOD designation flag (M6.1). Only marks the teacher as the HOD of
+     * {@link #department}; the role system itself is unchanged (HOD is a User
+     * role, not a Teacher role).
+     */
+    @Column(name = "is_hod", nullable = false)
+    @Builder.Default
+    private Boolean isHod = false;
+
     @Column(nullable = false)
     private String password;
 
