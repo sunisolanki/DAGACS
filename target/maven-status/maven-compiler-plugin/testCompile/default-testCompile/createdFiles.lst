@@ -13,6 +13,7 @@ com\dagacs\repository\StudentRepositoryTest.class
 com\dagacs\service\AttendanceCalculationServiceTest.class
 com\dagacs\security\HodAnalyticsIntegrationTest.class
 com\dagacs\dto\StudentManagementRequestDTOValidationTest.class
+com\dagacs\security\AccountStatusIntegrationTest.class
 com\dagacs\security\AttendanceCalculationOwnershipIntegrationTest.class
 com\dagacs\service\AttendanceRecordServiceTest.class
 com\dagacs\service\SectionServiceTest.class
@@ -23,6 +24,7 @@ com\dagacs\security\M72ExportIntegrationTest$Slice.class
 com\dagacs\service\AttendanceAuditLogServiceTest.class
 com\dagacs\repository\TeacherRepositoryTest.class
 com\dagacs\service\ProgramServiceTest.class
+com\dagacs\config\ProdConfigSanityTest.class
 com\dagacs\exception\ExceptionHandlerTest.class
 com\dagacs\controller\ProgramControllerTest.class
 com\dagacs\service\SemesterServiceTest.class

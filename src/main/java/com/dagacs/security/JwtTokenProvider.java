@@ -15,16 +15,26 @@ import java.util.List;
 @Component
 public class JwtTokenProvider {
 
+    private static final String DEV_DEFAULT_SECRET = "dagacs-dev-secret-change-me-in-production-32bytes-min";
+
     @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration-ms:3600000}")
     private long expirationMs;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
+
     private SecretKey secretKey;
 
     @PostConstruct
     public void init() {
+        if (activeProfiles != null && activeProfiles.contains("prod")
+                && DEV_DEFAULT_SECRET.equals(secret)) {
+            throw new IllegalStateException(
+                    "Refusing to start in production with the default development JWT secret");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 

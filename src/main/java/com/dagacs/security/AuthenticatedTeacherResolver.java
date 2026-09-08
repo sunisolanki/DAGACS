@@ -33,8 +33,12 @@ public class AuthenticatedTeacherResolver {
         if (email == null || email.isBlank()) {
             throw new AuthException("Unable to resolve the authenticated teacher", 401);
         }
-        return teacherRepository.findByEmail(email)
+        Teacher teacher = teacherRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthException(
                         "No teacher account is linked to the authenticated user", 401));
+        if (!"ACTIVE".equals(teacher.getStatus())) {
+            throw new AuthException("The teacher account is inactive", 401);
+        }
+        return teacher;
     }
 }

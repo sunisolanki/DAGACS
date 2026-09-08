@@ -8,6 +8,7 @@ D:\DAGACS\backend\src\test\java\com\dagacs\security\HodAnalyticsIntegrationTest.
 D:\DAGACS\backend\src\test\java\com\dagacs\export\ExcelReportGeneratorTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\SubjectServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\StudentProfileIntegrationTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\security\AccountStatusIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\SubjectControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\repository\StudentRepositoryTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\BatchServiceTest.java
@@ -41,6 +42,7 @@ D:\DAGACS\backend\src\test\java\com\dagacs\repository\AttendanceRecordAggregatio
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\AttendanceControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\DepartmentControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\dto\StudentManagementRequestDTOValidationTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\config\ProdConfigSanityTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\exception\ExceptionHandlerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\repository\TeacherRepositoryTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\BatchControllerTest.java

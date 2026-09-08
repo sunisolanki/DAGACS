@@ -35,8 +35,12 @@ public class AuthenticatedStudentResolver {
         if (email == null || email.isBlank()) {
             throw new AuthException("Unable to resolve the authenticated student", 401);
         }
-        return studentRepository.findByEmail(email)
+        Student student = studentRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthException(
                         "No student account is linked to the authenticated user", 401));
+        if (!"ACTIVE".equals(student.getStatus())) {
+            throw new AuthException("The student account is inactive", 401);
+        }
+        return student;
     }
 }

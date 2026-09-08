@@ -1,6 +1,7 @@
 package com.dagacs.security;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -31,6 +32,9 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
     private final UserDetailsService userDetailsService;
 
+    @Value("${app.cors.allowed-origins:http://localhost:5500}")
+    private List<String> allowedOrigins;
+
     public SecurityConfig(JwtAuthenticationFilter jwtFilter, UserDetailsService userDetailsService) {
         this.jwtFilter = jwtFilter;
         this.userDetailsService = userDetailsService;
@@ -57,10 +61,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Development-only web panel origin (Flutter Web). Explicit, not a wildcard,
-        // so it can be safely paired with allowCredentials(true) for the Bearer header.
-        config.setAllowedOrigins(List.of("http://localhost:5500"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // Semantics (M8 F-08): explicit origins only. Kept explicit (never "*") so it
+        // can be safely paired with allowCredentials(true) for the Bearer header.
+        List<String> origins = allowedOrigins.stream().map(String::trim).toList();
+        if (origins.contains("*")) {
+            throw new IllegalArgumentException(
+                    "app.cors.allowed-origins must be an explicit origin list; '*' with allowCredentials(true) is forbidden");
+        }
+        config.setAllowedOrigins(origins);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

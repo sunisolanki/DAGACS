@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.controller.AcademicSessionControllerTest
 -------------------------------------------------------------------------------
-Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 15.19 s -- in com.dagacs.controller.AcademicSessionControllerTest
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.36 s -- in com.dagacs.controller.AcademicSessionControllerTest

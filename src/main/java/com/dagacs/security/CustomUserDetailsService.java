@@ -3,6 +3,7 @@ package com.dagacs.security;
 import com.dagacs.entity.Role;
 import com.dagacs.entity.User;
 import com.dagacs.repository.UserRepository;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,6 +27,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new DisabledException("Account is disabled");
+        }
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())

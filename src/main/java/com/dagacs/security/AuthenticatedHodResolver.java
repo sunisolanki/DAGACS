@@ -49,6 +49,10 @@ public class AuthenticatedHodResolver {
                 .orElseThrow(() -> new AuthException(
                         "No teacher account is linked to the authenticated HOD user", 401));
 
+        if (!"ACTIVE".equals(teacher.getStatus())) {
+            throw new AuthException("The teacher account is inactive", 401);
+        }
+
         if (teacher.getIsHod() == null || !teacher.getIsHod()) {
             throw new AuthException("The authenticated teacher is not configured as an HOD", 401);
         }
