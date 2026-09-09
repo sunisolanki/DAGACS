@@ -114,7 +114,7 @@ class AttendanceCalculationOwnershipIntegrationTest {
     private Subject createTestSubject() {
         return subjectRepository.save(Subject.builder()
                 .code("SUBJ-" + System.nanoTime()).name("TestSubject")
-                .description("Test").creditHours("3").department("CSE")
+                .description("Test").creditHours("3")
                 .status("ACTIVE")
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
@@ -127,8 +127,7 @@ class AttendanceCalculationOwnershipIntegrationTest {
                 .name("CalProg-" + System.nanoTime()).code("CP").duration("4yr")
                 .description("Test").department(dept).build());
         AcademicSession session = academicSessionRepository.save(AcademicSession.builder()
-                .name("CalSess-" + System.nanoTime()).code("CS").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("CalSess-" + System.nanoTime()).code("CS")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Batch batch = batchRepository.save(Batch.builder()
@@ -157,8 +156,7 @@ class AttendanceCalculationOwnershipIntegrationTest {
                 .name("CalSecProg-" + System.nanoTime()).code("CSP").duration("4yr")
                 .description("Test").department(dept).build());
         AcademicSession session = academicSessionRepository.save(AcademicSession.builder()
-                .name("CalSecSess-" + System.nanoTime()).code("CSS").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("CalSecSess-" + System.nanoTime()).code("CSS")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Batch batch = batchRepository.save(Batch.builder()

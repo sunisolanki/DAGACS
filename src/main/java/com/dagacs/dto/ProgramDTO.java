@@ -26,6 +26,7 @@ public class ProgramDTO {
     @Size(max = 20, message = "Program code must not exceed 20 characters")
     private String code;
 
+    /** Informational program duration (e.g. "4 years"). Display-only; no business logic consumes it. */
     @NotBlank(message = "Duration is required")
     @Size(max = 50, message = "Duration must not exceed 50 characters")
     private String duration;

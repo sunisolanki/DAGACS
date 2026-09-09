@@ -13,6 +13,10 @@ public interface AttendanceSessionRepository extends JpaRepository<AttendanceSes
 
     List<AttendanceSession> findBySectionEntityIdOrderByDateDesc(Long sectionId);
 
+    boolean existsBySubjectEntityId(Long subjectId);
+
+    boolean existsBySectionEntityId(Long sectionId);
+
     boolean existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
             Long subjectId, Long sectionId, String date, String lecturePeriod);
 }

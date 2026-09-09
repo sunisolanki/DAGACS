@@ -4,6 +4,17 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * A section within a {@link Batch}.
+ *
+ * <p>Legacy/deprecated column: a nullable {@code subject_id} FK may still
+ * exist from the old tentative design. No active code path ever writes it and
+ * it is intentionally NOT part of the domain. The intended future subject
+ * linkage is a {@code Teacher + Subject + Section} teaching assignment, which
+ * is a separate future milestone. Existing deployments keep the legacy column
+ * in place (see {@code SectionSubjectSchemaMigration}); it must not be read or
+ * written.
+ */
 @Entity
 @Table(name = "sections",
         uniqueConstraints = @UniqueConstraint(name = "uk_section_batch_name",
@@ -27,10 +38,6 @@ public class Section {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "batch_id", nullable = false)
     private Batch batch;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subject_id")
-    private Subject subject;
 
     @Column(nullable = false)
     private String status;

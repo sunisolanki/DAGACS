@@ -173,8 +173,7 @@ class HodAnalyticsIntegrationTest {
                 .name("Prog-" + System.nanoTime()).code("P").duration("4yr")
                 .description("Test").department(s.dept).build());
         s.session = academicSessionRepository.save(AcademicSession.builder()
-                .name("Sess-" + System.nanoTime()).code("S").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("Sess-" + System.nanoTime()).code("S")
                 .description("Test").program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
         s.batch = batchRepository.save(Batch.builder()
@@ -187,7 +186,7 @@ class HodAnalyticsIntegrationTest {
                 .createdAt(now()).updatedAt(now()).build());
         s.subject = subjectRepository.save(Subject.builder()
                 .code("SUBJ-" + System.nanoTime()).name("Subject " + deptCode)
-                .description("Test").creditHours("3").department(deptCode)
+                .description("Test").creditHours("3").department(s.dept)
                 .status("ACTIVE")
                 .createdAt(now()).updatedAt(now()).build());
         s.teacher = teacherRepository.save(Teacher.builder()

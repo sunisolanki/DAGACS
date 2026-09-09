@@ -6,6 +6,8 @@ import com.dagacs.dto.SectionDTO;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AttendanceRecordRepository;
+import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,12 +23,18 @@ public class SectionService {
 
     private final SectionRepository sectionRepository;
     private final BatchRepository batchRepository;
+    private final AttendanceSessionRepository attendanceSessionRepository;
+    private final AttendanceRecordRepository attendanceRecordRepository;
 
     @Autowired
     public SectionService(SectionRepository sectionRepository,
-                          BatchRepository batchRepository) {
+                          BatchRepository batchRepository,
+                          AttendanceSessionRepository attendanceSessionRepository,
+                          AttendanceRecordRepository attendanceRecordRepository) {
         this.sectionRepository = sectionRepository;
         this.batchRepository = batchRepository;
+        this.attendanceSessionRepository = attendanceSessionRepository;
+        this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
     @Transactional
@@ -137,6 +145,14 @@ public class SectionService {
     public void deleteSection(Long id) {
         Section section = sectionRepository.findById(id)
                 .orElseThrow(() -> new AuthException("Section not found with ID: " + id, 404));
+
+        if (attendanceRecordRepository.existsBySectionId(id)) {
+            throw new AuthException("Cannot delete this section because it is referenced by attendance records.", 409);
+        }
+        if (attendanceSessionRepository.existsBySectionEntityId(id)) {
+            throw new AuthException("Cannot delete this section because it is referenced by attendance sessions.", 409);
+        }
+
         sectionRepository.delete(section);
     }
 

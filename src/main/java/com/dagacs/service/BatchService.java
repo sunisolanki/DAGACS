@@ -165,7 +165,6 @@ public class BatchService {
                         .id(batch.getAcademicSession().getId())
                         .name(batch.getAcademicSession().getName())
                         .code(batch.getAcademicSession().getCode())
-                        .semester(batch.getAcademicSession().getSemester())
                         .build())
                 .program(batch.getProgram())
                 .maxCapacity(batch.getMaxCapacity())

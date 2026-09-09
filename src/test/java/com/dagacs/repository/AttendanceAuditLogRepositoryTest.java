@@ -70,8 +70,7 @@ class AttendanceAuditLogRepositoryTest {
                 .name("AProg-" + System.nanoTime()).code("AP").duration("4yr")
                 .description("Test").department(dept).build());
         AcademicSession session = academicSessionRepository.save(AcademicSession.builder()
-                .name("ASess-" + System.nanoTime()).code("AS").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("ASess-" + System.nanoTime()).code("AS")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Batch batch = batchRepository.save(Batch.builder()
@@ -94,7 +93,7 @@ class AttendanceAuditLogRepositoryTest {
     private AttendanceRecord createTestAttendanceRecord(Student student) {
         Subject subject = subjectRepository.save(Subject.builder()
                 .code("ASubj-" + System.nanoTime()).name("AuditSubject")
-                .description("Test").creditHours("3").department("CSE")
+                .description("Test").creditHours("3")
                 .status("ACTIVE")
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Teacher teacher = createTestTeacher();

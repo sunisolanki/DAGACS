@@ -52,7 +52,7 @@ class TeacherSubjectSectionAssignmentRepositoryTest {
     private Subject createSubject() {
         return subjectRepository.save(Subject.builder()
                 .code("SUBJ-" + System.nanoTime()).name("TestSubject")
-                .description("Test").creditHours("3").department("CSE")
+                .description("Test").creditHours("3")
                 .status("ACTIVE")
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
@@ -65,8 +65,7 @@ class TeacherSubjectSectionAssignmentRepositoryTest {
                 .name("Prog-" + System.nanoTime()).code("P").duration("4yr")
                 .description("Test").department(dept).build());
         AcademicSession session = academicSessionRepository.save(AcademicSession.builder()
-                .name("Sess-" + System.nanoTime()).code("S").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("Sess-" + System.nanoTime()).code("S")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Batch batch = batchRepository.save(Batch.builder()

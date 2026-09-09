@@ -2,7 +2,6 @@ package com.dagacs.repository;
 
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
-import com.dagacs.entity.Subject;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,7 +13,6 @@ public interface SectionRepository extends JpaRepository<Section, Long> {
     Optional<Section> findBySectionCode(String sectionCode);
     Optional<Section> findByNameAndBatch(String name, Batch batch);
     List<Section> findByBatch(Batch batch);
-    List<Section> findBySubject(Subject subject);
     List<Section> findAllByOrderByName();
     boolean existsBySectionCode(String sectionCode);
     boolean existsByNameAndBatch(String name, Batch batch);

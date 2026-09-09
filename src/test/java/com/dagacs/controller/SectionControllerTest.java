@@ -149,6 +149,16 @@ class SectionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
+    void deleteSection_referenced_returns409() throws Exception {
+        doThrow(new AuthException("Cannot delete this section because it is referenced by attendance records.", 409))
+                .when(sectionService).deleteSection(1L);
+
+        mockMvc.perform(delete("/api/admin/sections/1"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     @WithAnonymousUser
     void createSection_noToken_returns401() throws Exception {
         mockMvc.perform(post("/api/admin/sections")

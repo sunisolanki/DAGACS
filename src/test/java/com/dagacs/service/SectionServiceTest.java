@@ -6,6 +6,8 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AttendanceRecordRepository;
+import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +33,12 @@ class SectionServiceTest {
     @Mock
     private BatchRepository batchRepository;
 
+    @Mock
+    private AttendanceSessionRepository attendanceSessionRepository;
+
+    @Mock
+    private AttendanceRecordRepository attendanceRecordRepository;
+
     @InjectMocks
     private SectionService sectionService;
 
@@ -40,7 +48,7 @@ class SectionServiceTest {
     void setUp() {
         Program program = Program.builder().id(1L).name("M.Tech CSE").code("MTCSE").build();
         AcademicSession session = AcademicSession.builder()
-                .id(1L).name("2026-27").code("2026-27").semester("Semester 1").program(program).build();
+                .id(1L).name("2026-27").code("2026-27").program(program).build();
         batch = Batch.builder()
                 .id(1L).batchCode("B2026").name("2026 Batch").year(2026)
                 .academicSession(session).program("M.Tech CSE").maxCapacity(60)
@@ -159,8 +167,35 @@ class SectionServiceTest {
     void deleteSection_valid_deletes() {
         Section section = buildSection();
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(attendanceRecordRepository.existsBySectionId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityId(1L)).thenReturn(false);
 
         sectionService.deleteSection(1L);
         verify(sectionRepository).delete(section);
+    }
+
+    @Test
+    void deleteSection_referencedByRecords_returns409() {
+        Section section = buildSection();
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(attendanceRecordRepository.existsBySectionId(1L)).thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> sectionService.deleteSection(1L));
+        assertEquals(409, ex.getStatus());
+        verify(sectionRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteSection_referencedBySessions_returns409() {
+        Section section = buildSection();
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(attendanceRecordRepository.existsBySectionId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityId(1L)).thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> sectionService.deleteSection(1L));
+        assertEquals(409, ex.getStatus());
+        verify(sectionRepository, never()).delete(any());
     }
 }

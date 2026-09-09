@@ -52,11 +52,7 @@ class AcademicSessionServiceTest {
         AcademicSessionDTO dto = new AcademicSessionDTO();
         dto.setName("2026-27");
         dto.setCode("2026-27");
-        dto.setSemester("Semester 1");
         dto.setProgramId(1L);
-        dto.setDurationHours(40);
-        dto.setLecturePeriods(30);
-        dto.setCredits(20);
         return dto;
     }
 
@@ -65,11 +61,7 @@ class AcademicSessionServiceTest {
                 .id(1L)
                 .name("2026-27")
                 .code("2026-27")
-                .semester("Semester 1")
                 .program(program)
-                .durationHours(40)
-                .lecturePeriods(30)
-                .credits(20)
                 .build();
     }
 
@@ -109,6 +101,26 @@ class AcademicSessionServiceTest {
     void saveSession_blankName_returns400() {
         AcademicSessionDTO dto = validSessionDTO();
         dto.setName(" ");
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> academicSessionService.saveSession(dto));
+        assertEquals(400, ex.getStatus());
+    }
+
+    @Test
+    void saveSession_blankCode_returns400() {
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setCode(" ");
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> academicSessionService.saveSession(dto));
+        assertEquals(400, ex.getStatus());
+    }
+
+    @Test
+    void saveSession_missingCode_returns400() {
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setCode(null);
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> academicSessionService.saveSession(dto));

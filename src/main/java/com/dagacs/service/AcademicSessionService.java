@@ -44,6 +44,11 @@ public class AcademicSessionService {
             throw new AuthException("Session name is required", 400);
         }
 
+        String code = sessionDTO.getCode();
+        if (code == null || code.trim().isEmpty()) {
+            throw new AuthException("Session code is required", 400);
+        }
+
         Long programId = sessionDTO.getProgramId();
         if (programId == null) {
             throw new AuthException("Program is required", 400);
@@ -59,12 +64,8 @@ public class AcademicSessionService {
         LocalDateTime now = LocalDateTime.now();
         AcademicSession session = AcademicSession.builder()
                 .name(name)
-                .code(sessionDTO.getCode())
-                .semester(sessionDTO.getSemester())
+                .code(code)
                 .program(program)
-                .durationHours(sessionDTO.getDurationHours())
-                .lecturePeriods(sessionDTO.getLecturePeriods())
-                .credits(sessionDTO.getCredits())
                 .description(sessionDTO.getDescription())
                 .createdAt(now)
                 .updatedAt(now)
@@ -97,6 +98,11 @@ public class AcademicSessionService {
             throw new AuthException("Session name is required", 400);
         }
 
+        String code = sessionDTO.getCode();
+        if (code == null || code.trim().isEmpty()) {
+            throw new AuthException("Session code is required", 400);
+        }
+
         Long programId = sessionDTO.getProgramId();
         if (programId == null) {
             throw new AuthException("Program is required", 400);
@@ -111,12 +117,8 @@ public class AcademicSessionService {
         }
 
         session.setName(name);
-        session.setCode(sessionDTO.getCode());
-        session.setSemester(sessionDTO.getSemester());
+        session.setCode(code);
         session.setProgram(program);
-        session.setDurationHours(sessionDTO.getDurationHours());
-        session.setLecturePeriods(sessionDTO.getLecturePeriods());
-        session.setCredits(sessionDTO.getCredits());
         session.setDescription(sessionDTO.getDescription());
         session.setUpdatedAt(LocalDateTime.now());
         session = academicSessionRepository.save(session);
@@ -156,10 +158,6 @@ public class AcademicSessionService {
                 .id(session.getId())
                 .name(session.getName())
                 .code(session.getCode())
-                .semester(session.getSemester())
-                .durationHours(session.getDurationHours())
-                .lecturePeriods(session.getLecturePeriods())
-                .credits(session.getCredits())
                 .description(session.getDescription())
                 .programId(session.getProgram().getId())
                 .program(ProgramDTO.builder()

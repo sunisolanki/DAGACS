@@ -32,8 +32,7 @@ class AcademicSessionControllerTest {
     private AcademicSessionService academicSessionService;
 
     private String validJson() {
-        return "{\"name\":\"2026-27\",\"code\":\"2026-27\",\"semester\":\"Semester 1\"," +
-                "\"durationHours\":40,\"lecturePeriods\":30,\"credits\":20,\"programId\":1}";
+        return "{\"name\":\"2026-27\",\"code\":\"2026-27\",\"programId\":1}";
     }
 
     @Test
@@ -110,8 +109,16 @@ class AcademicSessionControllerTest {
     void createSession_blankName_returns400() throws Exception {
         mockMvc.perform(post("/api/admin/academic-sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"\",\"code\":\"2026-27\",\"semester\":\"Semester 1\"," +
-                                "\"durationHours\":40,\"lecturePeriods\":30,\"credits\":20,\"programId\":1}"))
+                        .content("{\"name\":\"\",\"code\":\"2026-27\",\"programId\":1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createSession_blankCode_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/academic-sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"2026-27\",\"code\":\"\",\"programId\":1}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -120,8 +127,7 @@ class AcademicSessionControllerTest {
     void createSession_missingProgram_returns400() throws Exception {
         mockMvc.perform(post("/api/admin/academic-sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"2026-27\",\"code\":\"2026-27\",\"semester\":\"Semester 1\"," +
-                                "\"durationHours\":40,\"lecturePeriods\":30,\"credits\":20}"))
+                        .content("{\"name\":\"2026-27\",\"code\":\"2026-27\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -133,8 +139,7 @@ class AcademicSessionControllerTest {
 
         mockMvc.perform(post("/api/admin/academic-sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"2026-27\",\"code\":\"2026-27\",\"semester\":\"Semester 1\"," +
-                                "\"durationHours\":40,\"lecturePeriods\":30,\"credits\":20,\"programId\":99}"))
+                        .content("{\"name\":\"2026-27\",\"code\":\"2026-27\",\"programId\":99}"))
                 .andExpect(status().isNotFound());
     }
 

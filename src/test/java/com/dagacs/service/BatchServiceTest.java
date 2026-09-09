@@ -45,7 +45,7 @@ class BatchServiceTest {
     void setUp() {
         program = Program.builder().id(1L).name("M.Tech CSE").code("MTCSE").build();
         academicSession = AcademicSession.builder()
-                .id(1L).name("2026-27").code("2026-27").semester("Semester 1").program(program).build();
+                .id(1L).name("2026-27").code("2026-27").program(program).build();
     }
 
     private BatchDTO validBatchDTO() {

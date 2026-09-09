@@ -21,6 +21,7 @@ public class Program {
     @Column(nullable = false)
     private String code;
 
+    /** Informational program duration (e.g. "4 years"). Display-only; no business logic consumes it. */
     @Column(nullable = false)
     private String duration;
 

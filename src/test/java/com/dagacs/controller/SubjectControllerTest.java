@@ -35,7 +35,7 @@ class SubjectControllerTest {
     private String validJson() {
         return "{\"code\":\"CS101\",\"name\":\"Data Structures\"," +
                 "\"description\":\"Course on data structures\",\"creditHours\":\"3\"," +
-                "\"department\":\"CSE\",\"status\":\"ACTIVE\"}";
+                "\"departmentId\":1,\"status\":\"ACTIVE\"}";
     }
 
     private SubjectDTO subjectDto() {
@@ -45,7 +45,7 @@ class SubjectControllerTest {
         dto.setName("Data Structures");
         dto.setDescription("Course on data structures");
         dto.setCreditHours("3");
-        dto.setDepartment("CSE");
+        dto.setDepartmentId(1L);
         dto.setStatus("ACTIVE");
         return dto;
     }
@@ -106,7 +106,7 @@ class SubjectControllerTest {
         mockMvc.perform(post("/api/admin/subjects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"\",\"name\":\"Data Structures\"," +
-                                "\"creditHours\":\"3\",\"department\":\"CSE\",\"status\":\"ACTIVE\"}"))
+                                "\"creditHours\":\"3\",\"departmentId\":1,\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -116,7 +116,7 @@ class SubjectControllerTest {
         mockMvc.perform(post("/api/admin/subjects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"CS101\",\"name\":\"\"," +
-                                "\"creditHours\":\"3\",\"department\":\"CSE\",\"status\":\"ACTIVE\"}"))
+                                "\"creditHours\":\"3\",\"departmentId\":1,\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -126,7 +126,27 @@ class SubjectControllerTest {
         mockMvc.perform(post("/api/admin/subjects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"CS101\",\"name\":\"Data Structures\"," +
-                                "\"creditHours\":\"3\",\"department\":\"CSE\"}"))
+                                "\"creditHours\":\"3\",\"departmentId\":1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createSubject_missingDepartment_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/subjects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"CS101\",\"name\":\"Data Structures\"," +
+                                "\"creditHours\":\"3\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createSubject_nonNumericCreditHours_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/subjects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"CS101\",\"name\":\"Data Structures\"," +
+                                "\"creditHours\":\"abc\",\"departmentId\":1,\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -155,7 +175,7 @@ class SubjectControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void deleteSubject_referenced_returns409() throws Exception {
-        doThrow(new AuthException("Cannot delete subject. Section(s) reference it: A", 409))
+        doThrow(new AuthException("Cannot delete this subject because it is referenced by attendance sessions.", 409))
                 .when(subjectService).deleteSubject(1L);
 
         mockMvc.perform(delete("/api/admin/subjects/1"))

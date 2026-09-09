@@ -112,8 +112,7 @@ class AccountStatusIntegrationTest {
                 .name("StProg-" + System.nanoTime()).code("SP").duration("4yr")
                 .description("Test").department(dept).build());
         AcademicSession session = academicSessionRepository.save(AcademicSession.builder()
-                .name("StSess-" + System.nanoTime()).code("SS").semester("1")
-                .durationHours(100).lecturePeriods(40).credits(20)
+                .name("StSess-" + System.nanoTime()).code("SS")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Batch batch = batchRepository.save(Batch.builder()
