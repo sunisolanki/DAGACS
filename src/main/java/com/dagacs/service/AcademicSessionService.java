@@ -66,7 +66,7 @@ public class AcademicSessionService {
                 .name(name)
                 .code(code)
                 .program(program)
-                .description(sessionDTO.getDescription())
+                .description(sessionDTO.getDescription() == null ? "" : sessionDTO.getDescription())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -119,7 +119,7 @@ public class AcademicSessionService {
         session.setName(name);
         session.setCode(code);
         session.setProgram(program);
-        session.setDescription(sessionDTO.getDescription());
+        session.setDescription(sessionDTO.getDescription() == null ? "" : sessionDTO.getDescription());
         session.setUpdatedAt(LocalDateTime.now());
         session = academicSessionRepository.save(session);
         return convertToDTO(session);

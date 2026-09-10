@@ -55,7 +55,7 @@ public class ProgramService {
                 .name(name)
                 .code(programDTO.getCode())
                 .duration(programDTO.getDuration())
-                .description(programDTO.getDescription())
+                .description(programDTO.getDescription() == null ? "" : programDTO.getDescription())
                 .department(department)
                 .build();
         program = programRepository.save(program);
@@ -91,7 +91,7 @@ public class ProgramService {
         program.setName(programDTO.getName());
         program.setCode(programDTO.getCode());
         program.setDuration(programDTO.getDuration());
-        program.setDescription(programDTO.getDescription());
+        program.setDescription(programDTO.getDescription() == null ? "" : programDTO.getDescription());
         program.setDepartment(department);
         program = programRepository.save(program);
         return convertToDTO(program);

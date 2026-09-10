@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import org.mockito.ArgumentCaptor;
+
 @ExtendWith(MockitoExtension.class)
 class AcademicSessionServiceTest {
 
@@ -137,6 +139,57 @@ class AcademicSessionServiceTest {
         assertNotNull(result);
         assertEquals("2026-27", result.getName());
         assertEquals(1L, result.getProgramId());
+    }
+
+    @Test
+    void saveSession_blankDescription_defaultsToEmptyString() {
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.existsByNameAndProgram("2026-27", program)).thenReturn(false);
+        when(academicSessionRepository.save(any(AcademicSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AcademicSessionDTO result = academicSessionService.saveSession(validSessionDTO());
+
+        ArgumentCaptor<AcademicSession> captor = ArgumentCaptor.forClass(AcademicSession.class);
+        verify(academicSessionRepository).save(captor.capture());
+        assertEquals("", captor.getValue().getDescription());
+        assertEquals(program, captor.getValue().getProgram());
+        assertEquals("", result.getDescription());
+    }
+
+    @Test
+    void saveSession_validDescription_isPreserved() {
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setDescription("First academic year");
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.existsByNameAndProgram("2026-27", program)).thenReturn(false);
+        when(academicSessionRepository.save(any(AcademicSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AcademicSessionDTO result = academicSessionService.saveSession(dto);
+
+        ArgumentCaptor<AcademicSession> captor = ArgumentCaptor.forClass(AcademicSession.class);
+        verify(academicSessionRepository).save(captor.capture());
+        assertEquals("First academic year", captor.getValue().getDescription());
+        assertEquals("First academic year", result.getDescription());
+    }
+
+    @Test
+    void updateSession_blankDescription_defaultsToEmptyString() {
+        AcademicSession existing = AcademicSession.builder()
+                .id(1L)
+                .name("2026-27")
+                .code("2026-27")
+                .description("old")
+                .program(program)
+                .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.save(any(AcademicSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        academicSessionService.updateSession(1L, validSessionDTO());
+
+        ArgumentCaptor<AcademicSession> captor = ArgumentCaptor.forClass(AcademicSession.class);
+        verify(academicSessionRepository).save(captor.capture());
+        assertEquals("", captor.getValue().getDescription());
     }
 
     @Test

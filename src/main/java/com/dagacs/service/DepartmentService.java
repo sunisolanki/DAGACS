@@ -34,7 +34,7 @@ public class DepartmentService {
         Department department = Department.builder()
                 .name(name)
                 .code(departmentDTO.getCode())
-                .description(departmentDTO.getDescription())
+                .description(departmentDTO.getDescription() == null ? "" : departmentDTO.getDescription())
                 .createdBy(departmentDTO.getCreatedBy() != null ? departmentDTO.getCreatedBy() : "SYSTEM")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -70,7 +70,7 @@ public class DepartmentService {
 
         department.setName(name);
         department.setCode(departmentDTO.getCode());
-        department.setDescription(departmentDTO.getDescription());
+        department.setDescription(departmentDTO.getDescription() == null ? "" : departmentDTO.getDescription());
         department.setUpdatedAt(LocalDateTime.now());
         department = departmentRepository.save(department);
         return convertToDTO(department);

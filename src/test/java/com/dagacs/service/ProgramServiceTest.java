@@ -1,6 +1,8 @@
 package com.dagacs.service;
 
+import com.dagacs.dto.ProgramDTO;
 import com.dagacs.entity.AcademicSession;
+import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
@@ -9,6 +11,7 @@ import com.dagacs.repository.ProgramRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -72,5 +75,78 @@ class ProgramServiceTest {
 
         programService.deleteProgram(1L);
         verify(programRepository).deleteById(1L);
+    }
+
+    @Test
+    void saveProgram_blankDescription_defaultsToEmptyString() {
+        Department department = Department.builder().id(1L).name("CSE").code("CS").build();
+        when(departmentRepository.findById(1L)).thenReturn(Optional.of(department));
+        when(programRepository.existsByNameAndDepartment("M.Tech CSE", department)).thenReturn(false);
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(1L);
+
+        ProgramDTO result = programService.saveProgram(dto);
+
+        ArgumentCaptor<Program> captor = ArgumentCaptor.forClass(Program.class);
+        verify(programRepository).save(captor.capture());
+        Program saved = captor.getValue();
+        assertEquals("", saved.getDescription());
+        assertEquals(department, saved.getDepartment());
+        assertEquals("", result.getDescription());
+    }
+
+    @Test
+    void saveProgram_validDescription_isPreserved() {
+        Department department = Department.builder().id(1L).name("CSE").code("CS").build();
+        when(departmentRepository.findById(1L)).thenReturn(Optional.of(department));
+        when(programRepository.existsByNameAndDepartment("M.Tech CSE", department)).thenReturn(false);
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(1L);
+        dto.setDescription("Postgraduate program");
+
+        ProgramDTO result = programService.saveProgram(dto);
+
+        ArgumentCaptor<Program> captor = ArgumentCaptor.forClass(Program.class);
+        verify(programRepository).save(captor.capture());
+        assertEquals("Postgraduate program", captor.getValue().getDescription());
+        assertEquals("Postgraduate program", result.getDescription());
+    }
+
+    @Test
+    void updateProgram_blankDescription_defaultsToEmptyString() {
+        Department department = Department.builder().id(1L).name("CSE").code("CS").build();
+        Program existing = Program.builder()
+                .id(1L)
+                .name("M.Tech CSE")
+                .code("MTCSE")
+                .duration("2 years")
+                .description("old")
+                .department(department)
+                .build();
+        when(programRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(departmentRepository.findById(1L)).thenReturn(Optional.of(department));
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(1L);
+
+        programService.updateProgram(1L, dto);
+
+        ArgumentCaptor<Program> captor = ArgumentCaptor.forClass(Program.class);
+        verify(programRepository).save(captor.capture());
+        assertEquals("", captor.getValue().getDescription());
     }
 }
