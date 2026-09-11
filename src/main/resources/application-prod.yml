@@ -23,3 +23,8 @@ app:
     student-password: ${DAGACS_STUDENT_PASSWORD}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  # M9.6 H1: role-echo / diagnostics endpoints are disabled in production.
+  # The @PreAuthorize guards stay active; the handler returns 404 instead of
+  # echoing principal identity.
+  diagnostics:
+    enabled: false

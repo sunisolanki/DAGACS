@@ -230,4 +230,22 @@ class AttendanceControllerTest {
                         .content(createSessionJson()))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    void createSession_invalidDate_returns400() throws Exception {
+        mockMvc.perform(post("/api/teacher/attendance/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subjectId\":1,\"sectionId\":1,\"lecturePeriod\":\"1st\",\"date\":\"2026-13-01\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    void updateSession_invalidDate_returns400() throws Exception {
+        mockMvc.perform(put("/api/teacher/attendance/sessions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturePeriod\":\"1st\",\"date\":\"2026-13-01\",\"status\":\"SCHEDULED\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

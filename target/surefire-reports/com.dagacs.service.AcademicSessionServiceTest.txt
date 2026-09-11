@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.service.AcademicSessionServiceTest
 -------------------------------------------------------------------------------
-Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.358 s -- in com.dagacs.service.AcademicSessionServiceTest
+Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.492 s -- in com.dagacs.service.AcademicSessionServiceTest

@@ -4,8 +4,25 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * M9.3 canonical teaching assignment: a {@link Teacher} assigned to teach a
+ * {@link SubjectOffering} to a concrete {@link Section}.
+ *
+ * <p>The academic identity of the subject is carried exclusively by
+ * {@link #subjectOffering} (SubjectOffering -> Semester -> AcademicSession ->
+ * Program -> Department). The pre-M9.3 {@code teacher_subject_section_assignments.subject_id}
+ * column is a deprecated compatibility column that this entity no longer maps;
+ * no active code reads or writes it (see TeacherAssignmentSchemaMigration).</p>
+ *
+ * <p>Uniqueness is {@code uk_assignment (teacher_id, subject_offering_id,
+ * section_id)}: one teacher teaches at most one subject+section, while many
+ * different teachers MAY be assigned to the same SubjectOffering + Section.
+ * No uniqueness exists on (subject_offering_id, section_id) alone.</p>
+ */
 @Entity
-@Table(name = "teacher_subject_section_assignments")
+@Table(name = "teacher_subject_section_assignments",
+        uniqueConstraints = @UniqueConstraint(name = "uk_assignment",
+                columnNames = {"teacher_id", "subject_offering_id", "section_id"}))
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TeacherSubjectSectionAssignment {
 
@@ -18,10 +35,16 @@ public class TeacherSubjectSectionAssignment {
     private Teacher teacher;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subject_id", nullable = false)
-    private Subject subject;
+    @JoinColumn(name = "subject_offering_id", nullable = false)
+    private SubjectOffering subjectOffering;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id", nullable = false)
     private Section section;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
 }

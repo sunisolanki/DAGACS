@@ -87,7 +87,7 @@ class AttendanceServiceTest {
     void markAttendance_valid_savesAllRecords() {
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(studentRepository.findAllById(List.of(1L, 2L)))
                 .thenReturn(List.of(student1, student2));
         when(attendanceRecordRepository.save(any(AttendanceRecord.class)))
@@ -102,7 +102,7 @@ class AttendanceServiceTest {
     void markAttendance_duplicate_rollsBackAndThrows409() {
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(studentRepository.findAllById(anyList())).thenAnswer(inv ->
                 ((List<Long>) inv.getArgument(0)).stream()
                         .map(id -> id.equals(1L) ? student1 : student2)
@@ -126,7 +126,7 @@ class AttendanceServiceTest {
 
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(studentRepository.findAllById(List.of(3L))).thenReturn(List.of(other));
 
         AuthException ex = assertThrows(AuthException.class,
@@ -139,7 +139,7 @@ class AttendanceServiceTest {
     void markAttendance_unassignedTeacher_returns403() {
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(false);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(false);
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceService.markAttendance(validRequest()));
@@ -154,7 +154,7 @@ class AttendanceServiceTest {
                 .lecturePeriod("1st").date("2026-09-04").status("CANCELLED").build();
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(cancelled));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceService.markAttendance(validRequest()));
@@ -185,7 +185,7 @@ class AttendanceServiceTest {
 
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(studentRepository.findAllById(List.of(1L, 1L))).thenReturn(List.of(student1));
 
         AuthException ex = assertThrows(AuthException.class,
@@ -203,7 +203,7 @@ class AttendanceServiceTest {
 
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceService.markAttendance(request));
@@ -224,7 +224,7 @@ class AttendanceServiceTest {
         AttendanceRecord record = buildRecord("ABSENT");
         when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(attendanceRecordRepository.save(any(AttendanceRecord.class))).thenAnswer(inv -> inv.getArgument(0));
         when(auditLogService.recordChange(any(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(null);
@@ -243,7 +243,7 @@ class AttendanceServiceTest {
         AttendanceRecord record = buildRecord("PRESENT");
         when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
 
         AttendanceUpdateRequestDTO dto = AttendanceUpdateRequestDTO.builder().newStatus("PRESENT").build();
         AuthException ex = assertThrows(AuthException.class,
@@ -257,7 +257,7 @@ class AttendanceServiceTest {
         AttendanceRecord record = buildRecord("ABSENT");
         when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(false);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(false);
 
         AttendanceUpdateRequestDTO dto = AttendanceUpdateRequestDTO.builder().newStatus("PRESENT").build();
         AuthException ex = assertThrows(AuthException.class,

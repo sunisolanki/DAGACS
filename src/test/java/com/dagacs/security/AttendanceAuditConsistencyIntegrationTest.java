@@ -8,8 +8,10 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Section;
+import com.dagacs.entity.Semester;
 import com.dagacs.entity.Student;
 import com.dagacs.entity.Subject;
+import com.dagacs.entity.SubjectOffering;
 import com.dagacs.entity.Teacher;
 import com.dagacs.entity.TeacherSubjectSectionAssignment;
 import com.dagacs.repository.AcademicSessionRepository;
@@ -20,7 +22,9 @@ import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.SubjectOfferingRepository;
 import com.dagacs.repository.SubjectRepository;
 import com.dagacs.repository.TeacherRepository;
 import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
@@ -92,6 +96,14 @@ class AttendanceAuditConsistencyIntegrationTest {
     private AcademicSessionRepository academicSessionRepository;
 
     @Autowired
+    private SemesterRepository semesterRepository;
+
+    @Autowired
+    private SubjectOfferingRepository subjectOfferingRepository;
+
+    private AcademicSession sectionSession;
+
+    @Autowired
     private ProgramRepository programRepository;
 
     @Autowired
@@ -146,6 +158,7 @@ class AttendanceAuditConsistencyIntegrationTest {
                 .name("Sess-" + System.nanoTime()).code("S")
                 .description("Test").program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
+        sectionSession = session;
         Batch batch = batchRepository.save(Batch.builder()
                 .batchCode("Bat-" + System.nanoTime()).name("B1").year(2026)
                 .program("Prog").maxCapacity(60).academicSession(session)
@@ -153,6 +166,16 @@ class AttendanceAuditConsistencyIntegrationTest {
         return sectionRepository.save(Section.builder()
                 .sectionCode("Sec-" + System.nanoTime()).name("A").maxCapacity(30)
                 .batch(batch).status("ACTIVE")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
+    }
+
+    private SubjectOffering createOffering(Subject subject) {
+        Semester semester = semesterRepository.save(Semester.builder()
+                .name("Sem-" + System.nanoTime()).code("SEM").year(2026)
+                .academicSession(sectionSession)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
+        return subjectOfferingRepository.save(SubjectOffering.builder()
+                .subject(subject).semester(semester)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 
@@ -200,7 +223,8 @@ class AttendanceAuditConsistencyIntegrationTest {
         Subject subject = createSubject();
         Section section = createSection();
         assignmentRepository.save(TeacherSubjectSectionAssignment.builder()
-                .teacher(teacher).subject(subject).section(section).build());
+                .teacher(teacher).subjectOffering(createOffering(subject)).section(section)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         Student student = createStudent();
 
         AttendanceSession session = attendanceSessionRepository.save(AttendanceSession.builder()

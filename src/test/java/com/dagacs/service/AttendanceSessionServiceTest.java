@@ -78,7 +78,7 @@ class AttendanceSessionServiceTest {
         when(teacherResolver.resolve()).thenReturn(teacher);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
                 1L, 1L, "2026-09-04", "1st")).thenReturn(false);
         when(attendanceSessionRepository.save(any(AttendanceSession.class))).thenAnswer(inv -> {
@@ -119,7 +119,7 @@ class AttendanceSessionServiceTest {
         when(teacherResolver.resolve()).thenReturn(teacher);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(false);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(false);
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceSessionService.createSession(validDTO()));
@@ -131,7 +131,7 @@ class AttendanceSessionServiceTest {
         when(teacherResolver.resolve()).thenReturn(teacher);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
         when(attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
                 1L, 1L, "2026-09-04", "1st")).thenReturn(true);
 
@@ -187,7 +187,7 @@ class AttendanceSessionServiceTest {
 
     private void stubUpdateAuthorized() {
         when(teacherResolver.resolve()).thenReturn(teacher);
-        when(assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(1L, 1L, 1L)).thenReturn(true);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
     }
 
     @Test

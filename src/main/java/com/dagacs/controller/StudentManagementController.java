@@ -1,7 +1,9 @@
 package com.dagacs.controller;
 
+import com.dagacs.dto.StudentLoginRequestDTO;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
+import com.dagacs.dto.StudentPasswordUpdateRequestDTO;
 import com.dagacs.dto.StudentStatusDTO;
 import com.dagacs.service.StudentManagementService;
 import jakarta.validation.Valid;
@@ -68,5 +70,27 @@ public class StudentManagementController {
     public ResponseEntity<StudentManagementDTO> updateStudentStatus(
             @PathVariable Long id, @Valid @RequestBody StudentStatusDTO statusDTO) {
         return ResponseEntity.ok(studentManagementService.setStudentStatus(id, statusDTO.getStatus()));
+    }
+
+    @PostMapping("/{id}/login")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StudentManagementDTO> provisionLogin(
+            @PathVariable Long id, @Valid @RequestBody StudentLoginRequestDTO requestDTO) {
+        return ResponseEntity.status(201)
+                .body(studentManagementService.provisionLogin(id, requestDTO));
+    }
+
+    @PatchMapping("/{id}/login/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StudentManagementDTO> setLoginStatus(
+            @PathVariable Long id, @Valid @RequestBody StudentStatusDTO requestDTO) {
+        return ResponseEntity.ok(studentManagementService.setLoginStatus(id, requestDTO.getStatus()));
+    }
+
+    @PutMapping("/{id}/login/password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StudentManagementDTO> setLoginPassword(
+            @PathVariable Long id, @Valid @RequestBody StudentPasswordUpdateRequestDTO requestDTO) {
+        return ResponseEntity.ok(studentManagementService.setLoginPassword(id, requestDTO.getPassword()));
     }
 }

@@ -2,6 +2,7 @@ package com.dagacs.service;
 
 import com.dagacs.dto.AcademicSessionDTO;
 import com.dagacs.dto.BatchDTO;
+import com.dagacs.dto.SectionDTO;
 import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -72,13 +74,17 @@ public class BatchService {
                 .updatedAt(now)
                 .build();
         batch = batchRepository.save(batch);
-        return convertToDTO(batch);
+        return convertToDTO(batch, List.of());
     }
 
     @Transactional(readOnly = true)
     public List<BatchDTO> getAllBatches() {
-        return batchRepository.findAllByOrderByName().stream()
-                .map(this::convertToDTO)
+        List<Batch> batches = batchRepository.findAllByOrderByName();
+        Map<Long, List<Section>> sectionsByBatch = sectionRepository.findByBatchIn(batches).stream()
+                .collect(Collectors.groupingBy(section -> section.getBatch().getId()));
+        return batches.stream()
+                .map(batch -> convertToDTO(batch,
+                        sectionsByBatch.getOrDefault(batch.getId(), List.of())))
                 .collect(Collectors.toList());
     }
 
@@ -86,7 +92,7 @@ public class BatchService {
     public BatchDTO getBatchById(Long id) {
         Batch batch = batchRepository.findById(id)
                 .orElseThrow(() -> new AuthException("Batch not found with ID: " + id, 404));
-        return convertToDTO(batch);
+        return convertToDTO(batch, sectionRepository.findByBatch(batch));
     }
 
     @Transactional
@@ -128,15 +134,19 @@ public class BatchService {
         batch.setMaxCapacity(batchDTO.getMaxCapacity());
         batch.setUpdatedAt(LocalDateTime.now());
         batch = batchRepository.save(batch);
-        return convertToDTO(batch);
+        return convertToDTO(batch, sectionRepository.findByBatch(batch));
     }
 
     @Transactional(readOnly = true)
     public List<BatchDTO> getBatchesBySession(Long academicSessionId) {
         AcademicSession academicSession = academicSessionRepository.findById(academicSessionId)
                 .orElseThrow(() -> new AuthException("Academic session not found with ID: " + academicSessionId, 404));
-        return batchRepository.findByAcademicSession(academicSession).stream()
-                .map(this::convertToDTO)
+        List<Batch> batches = batchRepository.findByAcademicSession(academicSession);
+        Map<Long, List<Section>> sectionsByBatch = sectionRepository.findByBatchIn(batches).stream()
+                .collect(Collectors.groupingBy(section -> section.getBatch().getId()));
+        return batches.stream()
+                .map(batch -> convertToDTO(batch,
+                        sectionsByBatch.getOrDefault(batch.getId(), List.of())))
                 .collect(Collectors.toList());
     }
 
@@ -154,7 +164,7 @@ public class BatchService {
         batchRepository.delete(batch);
     }
 
-    private BatchDTO convertToDTO(Batch batch) {
+    private BatchDTO convertToDTO(Batch batch, List<Section> sections) {
         return BatchDTO.builder()
                 .id(batch.getId())
                 .batchCode(batch.getBatchCode())
@@ -168,6 +178,15 @@ public class BatchService {
                         .build())
                 .program(batch.getProgram())
                 .maxCapacity(batch.getMaxCapacity())
+                .sections(sections.stream()
+                        .map(section -> SectionDTO.builder()
+                                .id(section.getId())
+                                .sectionCode(section.getSectionCode())
+                                .name(section.getName())
+                                .maxCapacity(section.getMaxCapacity())
+                                .batchId(section.getBatch().getId())
+                                .build())
+                        .collect(Collectors.toList()))
                 .createdAt(batch.getCreatedAt())
                 .updatedAt(batch.getUpdatedAt())
                 .build();

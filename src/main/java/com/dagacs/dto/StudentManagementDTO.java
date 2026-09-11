@@ -37,6 +37,9 @@ public class StudentManagementDTO {
     private Long sectionId;
     private String sectionName;
 
+    private boolean loginLinked;
+    private String loginStatus;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

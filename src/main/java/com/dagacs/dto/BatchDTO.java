@@ -1,5 +1,7 @@
 package com.dagacs.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -10,6 +12,15 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * DTO for an admission cohort (Batch).
+ * <p>
+ * A Batch is the student cohort admitted in a given year for a Program.
+ * Program context is relational through {@link #academicSessionId} (Batch →
+ * AcademicSession → Program); {@link #program} is a derived denormalized
+ * snapshot of that program name and is never accepted from client input.
+ * </p>
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -26,7 +37,10 @@ public class BatchDTO {
     @Size(max = 100, message = "Batch name must not exceed 100 characters")
     private String name;
 
+    /** Admission year of the cohort. */
     @NotNull(message = "Year is required")
+    @Min(value = 2000, message = "Admission year must be at least 2000")
+    @Max(value = 2100, message = "Admission year must not exceed 2100")
     private Integer year;
 
     @NotNull(message = "AcademicSession is required")
@@ -34,6 +48,7 @@ public class BatchDTO {
 
     private AcademicSessionDTO academicSession;
 
+    /** Derived program name (snapshot of the academic session's program). */
     private String program; // program name string, derived from academic session's program for consistency
 
     @NotNull(message = "Max capacity is required")

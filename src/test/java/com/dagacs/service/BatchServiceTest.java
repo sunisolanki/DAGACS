@@ -1,6 +1,7 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.BatchDTO;
+import com.dagacs.dto.SectionDTO;
 import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Program;
@@ -12,12 +13,14 @@ import com.dagacs.repository.SectionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +93,71 @@ class BatchServiceTest {
 
         BatchDTO result = batchService.saveBatch(dto);
         assertEquals("M.Tech CSE", result.getProgram());
+    }
+
+    @Test
+    void updateBatch_derivesProgramFromSession_notUserInput() {
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setProgram("WRONG PROGRAM");
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(academicSession));
+        when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BatchDTO result = batchService.updateBatch(1L, dto);
+        assertEquals("M.Tech CSE", result.getProgram());
+        ArgumentCaptor<Batch> captor = ArgumentCaptor.forClass(Batch.class);
+        verify(batchRepository).save(captor.capture());
+        assertEquals("M.Tech CSE", captor.getValue().getProgram());
+        assertEquals(1L, captor.getValue().getAcademicSession().getId());
+    }
+
+    @Test
+    void updateBatch_advancingToAnotherSessionOfSameProgram_refreshesProgram() {
+        AcademicSession nextSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28").program(program).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(nextSession));
+        when(batchRepository.existsByAcademicSessionAndName(nextSession, "2026 Batch")).thenReturn(false);
+        when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BatchDTO result = batchService.updateBatch(1L, dto);
+        assertEquals(2L, result.getAcademicSessionId());
+        assertEquals("M.Tech CSE", result.getProgram());
+        ArgumentCaptor<Batch> captor = ArgumentCaptor.forClass(Batch.class);
+        verify(batchRepository).save(captor.capture());
+        assertEquals(nextSession, captor.getValue().getAcademicSession());
+        assertEquals("M.Tech CSE", captor.getValue().getProgram());
+    }
+
+    @Test
+    void getBatchById_includesSections() {
+        Batch batch = buildBatch();
+        Section sectionA = Section.builder().id(1L).sectionCode("A").name("A").batch(batch).build();
+        Section sectionB = Section.builder().id(2L).sectionCode("B").name("B").batch(batch).build();
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(sectionRepository.findByBatch(batch)).thenReturn(List.of(sectionA, sectionB));
+
+        BatchDTO result = batchService.getBatchById(1L);
+        assertEquals(List.of("A", "B"),
+                result.getSections().stream().map(SectionDTO::getName).collect(Collectors.toList()));
+    }
+
+    @Test
+    void getAllBatches_includesSections() {
+        Batch batch = buildBatch();
+        Section sectionA = Section.builder().id(1L).sectionCode("A").name("A").batch(batch).build();
+        Section sectionB = Section.builder().id(2L).sectionCode("B").name("B").batch(batch).build();
+        when(batchRepository.findAllByOrderByName()).thenReturn(List.of(batch));
+        when(sectionRepository.findByBatchIn(List.of(batch))).thenReturn(List.of(sectionA, sectionB));
+
+        List<BatchDTO> result = batchService.getAllBatches();
+        assertEquals(1, result.size());
+        assertEquals(List.of("A", "B"),
+                result.get(0).getSections().stream().map(SectionDTO::getName).collect(Collectors.toList()));
     }
 
     @Test

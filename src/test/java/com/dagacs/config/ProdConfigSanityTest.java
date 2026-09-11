@@ -14,6 +14,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the development secrets/passwords in application.yml. Every secret, DB
  * credential, seed password, and CORS origin in application-prod.yml is a
  * defaultless ${ENV_VAR} placeholder, so a missing variable fails startup.
+ *
+ * M9.6 N adds the schema-governance guards: prod must never switch to a
+ * destructive ddl-auto, and the validate-only rehearsal profile must exist as a
+ * drift gate that is never the default profile.
  */
 class ProdConfigSanityTest {
 
@@ -79,5 +83,33 @@ class ProdConfigSanityTest {
         String yaml = prodYaml();
         assertFalse(yaml.contains("localhost"),
                 "application-prod.yml must not inherit the development localhost CORS origin");
+    }
+
+    @Test
+    void prodProfile_neverSetsDestructiveDdlAuto() throws IOException {
+        // M9.6 N: the production profile must never enable create/create-drop/drop.
+        // It currently overrides nothing, so it inherits application.yml's
+        // ddl-auto: update, which is exactly the sanctioned M9.6 strategy.
+        String yaml = prodYaml();
+        assertFalse(yaml.contains("ddl-auto: create"),
+                "application-prod.yml must not set ddl-auto: create");
+        assertFalse(yaml.contains("ddl-auto: create-drop"),
+                "application-prod.yml must not set ddl-auto: create-drop");
+        assertFalse(yaml.contains("ddl-auto: drop"),
+                "application-prod.yml must not set ddl-auto: drop");
+    }
+
+    @Test
+    void validateRehearsalProfile_ExistsAndValidatesWithoutWriting() throws IOException {
+        // M9.6 N-A: the validate-only rehearsal profile must exist and pin
+        // ddl-auto to validate so release rehearsal proves schema drift without
+        // risking a production DELETE/drop from a wrong retrofit.
+        String yaml = new String(
+                new ClassPathResource("application-validate.yml").getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8);
+        assertTrue(yaml.contains("ddl-auto: validate"),
+                "application-validate.yml must pin ddl-auto to validate");
+        assertFalse(yaml.contains("spring.profiles.default"),
+                "application-validate.yml must not become a default profile");
     }
 }

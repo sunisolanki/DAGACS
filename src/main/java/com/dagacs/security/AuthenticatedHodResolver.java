@@ -1,6 +1,7 @@
 package com.dagacs.security;
 
 import com.dagacs.entity.Teacher;
+import com.dagacs.exception.AuthErrorCode;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.TeacherRepository;
 import org.springframework.security.core.Authentication;
@@ -42,23 +43,28 @@ public class AuthenticatedHodResolver {
             email = principal;
         }
         if (email == null || email.isBlank()) {
-            throw new AuthException("Unable to resolve the authenticated HOD", 401);
+            throw new AuthException("Unable to resolve the authenticated HOD", 401,
+                    AuthErrorCode.UNABLE_TO_RESOLVE_IDENTITY);
         }
 
         Teacher teacher = teacherRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthException(
-                        "No teacher account is linked to the authenticated HOD user", 401));
+                        "No teacher account is linked to the authenticated HOD user", 401,
+                        AuthErrorCode.HOD_PROFILE_NOT_LINKED));
 
         if (!"ACTIVE".equals(teacher.getStatus())) {
-            throw new AuthException("The teacher account is inactive", 401);
+            throw new AuthException("The teacher account is inactive", 401,
+                    AuthErrorCode.HOD_PROFILE_INACTIVE);
         }
 
         if (teacher.getIsHod() == null || !teacher.getIsHod()) {
-            throw new AuthException("The authenticated teacher is not configured as an HOD", 401);
+            throw new AuthException("The authenticated teacher is not configured as an HOD", 401,
+                    AuthErrorCode.HOD_NOT_DESIGNATED);
         }
 
         if (teacher.getDepartment() == null) {
-            throw new AuthException("The authenticated HOD has no department configured", 401);
+            throw new AuthException("The authenticated HOD has no department configured", 401,
+                    AuthErrorCode.HOD_NO_DEPARTMENT);
         }
 
         return teacher;

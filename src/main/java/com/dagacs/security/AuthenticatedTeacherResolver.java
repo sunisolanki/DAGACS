@@ -1,6 +1,7 @@
 package com.dagacs.security;
 
 import com.dagacs.entity.Teacher;
+import com.dagacs.exception.AuthErrorCode;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.TeacherRepository;
 import org.springframework.security.core.Authentication;
@@ -31,13 +32,16 @@ public class AuthenticatedTeacherResolver {
             email = principal;
         }
         if (email == null || email.isBlank()) {
-            throw new AuthException("Unable to resolve the authenticated teacher", 401);
+            throw new AuthException("Unable to resolve the authenticated teacher", 401,
+                    AuthErrorCode.UNABLE_TO_RESOLVE_IDENTITY);
         }
         Teacher teacher = teacherRepository.findByEmail(email)
                 .orElseThrow(() -> new AuthException(
-                        "No teacher account is linked to the authenticated user", 401));
+                        "No teacher account is linked to the authenticated user", 401,
+                        AuthErrorCode.TEACHER_PROFILE_NOT_LINKED));
         if (!"ACTIVE".equals(teacher.getStatus())) {
-            throw new AuthException("The teacher account is inactive", 401);
+            throw new AuthException("The teacher account is inactive", 401,
+                    AuthErrorCode.TEACHER_PROFILE_INACTIVE);
         }
         return teacher;
     }

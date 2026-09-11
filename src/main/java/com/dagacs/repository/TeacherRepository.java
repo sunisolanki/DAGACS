@@ -8,10 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface TeacherRepository extends JpaRepository<Teacher, Long> {
+
+    /**
+     * M9.3 admin master-data: existing teachers sorted by full name for the
+     * teacher-assignment screens and the /api/admin/teachers listing.
+     */
+    List<Teacher> findAllByOrderByFullNameAsc();
 
     Optional<Teacher> findByEmail(String email);
 

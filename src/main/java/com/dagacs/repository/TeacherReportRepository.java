@@ -27,7 +27,7 @@ public interface TeacherReportRepository extends JpaRepository<AttendanceRecord,
             + "JOIN ar.subject sub JOIN ar.section sec "
             + "WHERE t.id = :teacherId "
             + "AND EXISTS (SELECT 1 FROM TeacherSubjectSectionAssignment a "
-            + "WHERE a.teacher.id = t.id AND a.subject.id = sub.id AND a.section.id = sec.id) "
+            + "WHERE a.teacher.id = t.id AND a.subjectOffering.subject.id = sub.id AND a.section.id = sec.id) "
             + "AND (:startDate IS NULL OR ar.date >= :startDate) "
             + "AND (:endDate IS NULL OR ar.date <= :endDate) "
             + "GROUP BY sub.id, sub.code, sub.name, sec.id, sec.sectionCode, sec.name "

@@ -8,8 +8,10 @@ import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Role;
 import com.dagacs.entity.Section;
+import com.dagacs.entity.Semester;
 import com.dagacs.entity.Student;
 import com.dagacs.entity.Subject;
+import com.dagacs.entity.SubjectOffering;
 import com.dagacs.entity.Teacher;
 import com.dagacs.entity.TeacherSubjectSectionAssignment;
 import com.dagacs.entity.User;
@@ -22,7 +24,9 @@ import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.RoleRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.SubjectOfferingRepository;
 import com.dagacs.repository.SubjectRepository;
 import com.dagacs.repository.TeacherRepository;
 import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
@@ -137,6 +141,12 @@ class M72ExportIntegrationTest {
     private TeacherSubjectSectionAssignmentRepository assignmentRepository;
 
     @Autowired
+    private SemesterRepository semesterRepository;
+
+    @Autowired
+    private SubjectOfferingRepository subjectOfferingRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -221,6 +231,8 @@ class M72ExportIntegrationTest {
         Batch batch;
         Section section;
         Subject subject;
+        Semester semester;
+        SubjectOffering offering;
         Teacher teacher;
     }
 
@@ -248,6 +260,13 @@ class M72ExportIntegrationTest {
                 .code("SUBJ-" + System.nanoTime()).name("Subject " + deptCode)
                 .description("Test").creditHours("3").department(s.dept)
                 .status("ACTIVE")
+                .createdAt(now()).updatedAt(now()).build());
+        s.semester = semesterRepository.save(Semester.builder()
+                .name("Sem-" + System.nanoTime()).code("SEM").year(2026)
+                .academicSession(s.session)
+                .createdAt(now()).updatedAt(now()).build());
+        s.offering = subjectOfferingRepository.save(SubjectOffering.builder()
+                .subject(s.subject).semester(s.semester)
                 .createdAt(now()).updatedAt(now()).build());
         s.teacher = teacherRepository.save(Teacher.builder()
                 .email("marker" + System.nanoTime() + "@dagacs.local").password("ignored")
@@ -308,9 +327,16 @@ class M72ExportIntegrationTest {
                 .createdAt(now()).updatedAt(now()).build());
     }
 
-    private void assign(Teacher teacher, Subject subject, Section section) {
+    private void assign(Teacher teacher, SubjectOffering offering, Section section) {
         assignmentRepository.save(TeacherSubjectSectionAssignment.builder()
-                .teacher(teacher).subject(subject).section(section).build());
+                .teacher(teacher).subjectOffering(offering).section(section)
+                .createdAt(now()).updatedAt(now()).build());
+    }
+
+    private SubjectOffering offeringFor(Slice s, Subject subject) {
+        return subjectOfferingRepository.save(SubjectOffering.builder()
+                .subject(subject).semester(s.semester)
+                .createdAt(now()).updatedAt(now()).build());
     }
 
     private Subject extraSubject(Slice s, String code, String name) {
@@ -784,7 +810,7 @@ class M72ExportIntegrationTest {
     void teacherExport_xlsx_ownSubjectOnlyAndSemantics() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-10", "LP1", "CONDUCTED"), s1, true);
         record(saveSession(a.subject, a.section, t1, "2026-01-11", "LP2", "CONDUCTED"), s1, false);
@@ -818,9 +844,9 @@ class M72ExportIntegrationTest {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
         Teacher t2 = createTeacherAccount("teacherM72B@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Subject t2Subject = extraSubject(a, "TEACHB", "Teacher B Subject");
-        assign(t2, t2Subject, a.section);
+        assign(t2, offeringFor(a, t2Subject), a.section);
 
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-10", "LP1", "CONDUCTED"), s1, true);
@@ -840,7 +866,7 @@ class M72ExportIntegrationTest {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
         Subject unassigned = extraSubject(a, "UNASSIGN", "Unassigned Subject");
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-10", "LP1", "CONDUCTED"), s1, true);
         record(saveSession(unassigned, a.section, t1, "2026-01-11", "LP1", "CONDUCTED"), s1, true);
@@ -859,7 +885,7 @@ class M72ExportIntegrationTest {
     void teacherExport_xlsx_dateFilter_inclusive() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-05", "LP1", "CONDUCTED"), s1, true);
         record(saveSession(a.subject, a.section, t1, "2026-02-10", "LP2", "CONDUCTED"), s1, false);
@@ -882,7 +908,7 @@ class M72ExportIntegrationTest {
     void teacherExport_invertedRange_returns400() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         flush();
         String token = login("teacherM72A@dagacs.local", "Pass@123");
         mockMvc.perform(get("/api/teacher/attendance/report/export.xlsx")
@@ -912,7 +938,7 @@ class M72ExportIntegrationTest {
     void teacherExport_pdf_validWithData() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherM72A@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-10", "LP1", "CONDUCTED"), s1, true);
         flush();
@@ -942,7 +968,7 @@ class M72ExportIntegrationTest {
         Teacher tA = createTeacherAccount("teacherM72Big@dagacs.local", "Pass@123", a.dept);
         Teacher tB = createTeacherAccount("teacherM72B@dagacs.local", "Pass@123", a.dept);
         Subject tBSubject = extraSubject(a, "TEACHB", "Teacher B Subject");
-        assign(tB, tBSubject, a.section);
+        assign(tB, offeringFor(a, tBSubject), a.section);
         Student sB = student(a, "Student B");
         record(saveSession(tBSubject, a.section, tB, "2026-01-10", "LP1", "CONDUCTED"), sB, true);
 
@@ -950,7 +976,7 @@ class M72ExportIntegrationTest {
         for (int i = 1; i <= 205; i++) {
             String code = String.format("S%03d", i);
             Subject sub = extraSubject(a, code, "Subject " + code);
-            assign(tA, sub, a.section);
+            assign(tA, offeringFor(a, sub), a.section);
             record(saveSession(sub, a.section, tA, "2026-01-10", "LP" + i, "CONDUCTED"), s1, true);
         }
         flush();

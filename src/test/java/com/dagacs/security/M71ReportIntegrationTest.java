@@ -9,7 +9,9 @@ import com.dagacs.entity.Program;
 import com.dagacs.entity.Role;
 import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
+import com.dagacs.entity.Semester;
 import com.dagacs.entity.Subject;
+import com.dagacs.entity.SubjectOffering;
 import com.dagacs.entity.Teacher;
 import com.dagacs.entity.TeacherSubjectSectionAssignment;
 import com.dagacs.entity.User;
@@ -22,7 +24,9 @@ import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.RoleRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.SubjectOfferingRepository;
 import com.dagacs.repository.SubjectRepository;
 import com.dagacs.repository.TeacherRepository;
 import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
@@ -132,6 +136,12 @@ class M71ReportIntegrationTest {
     private TeacherSubjectSectionAssignmentRepository assignmentRepository;
 
     @Autowired
+    private SemesterRepository semesterRepository;
+
+    @Autowired
+    private SubjectOfferingRepository subjectOfferingRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -170,6 +180,8 @@ class M71ReportIntegrationTest {
         Batch batch;
         Section section;
         Subject subject;
+        Semester semester;
+        SubjectOffering offering;
         Teacher teacher;
     }
 
@@ -197,6 +209,13 @@ class M71ReportIntegrationTest {
                 .code("SUBJ-" + System.nanoTime()).name("Subject " + deptCode)
                 .description("Test").creditHours("3").department(s.dept)
                 .status("ACTIVE")
+                .createdAt(now()).updatedAt(now()).build());
+        s.semester = semesterRepository.save(Semester.builder()
+                .name("Sem-" + System.nanoTime()).code("SEM").year(2026)
+                .academicSession(s.session)
+                .createdAt(now()).updatedAt(now()).build());
+        s.offering = subjectOfferingRepository.save(SubjectOffering.builder()
+                .subject(s.subject).semester(s.semester)
                 .createdAt(now()).updatedAt(now()).build());
         s.teacher = teacherRepository.save(Teacher.builder()
                 .email("marker" + System.nanoTime() + "@dagacs.local").password("ignored")
@@ -257,9 +276,16 @@ class M71ReportIntegrationTest {
                 .createdAt(now()).updatedAt(now()).build());
     }
 
-    private void assign(Teacher teacher, Subject subject, Section section) {
+    private void assign(Teacher teacher, SubjectOffering offering, Section section) {
         assignmentRepository.save(TeacherSubjectSectionAssignment.builder()
-                .teacher(teacher).subject(subject).section(section).build());
+                .teacher(teacher).subjectOffering(offering).section(section)
+                .createdAt(now()).updatedAt(now()).build());
+    }
+
+    private SubjectOffering offeringFor(Slice s, Subject subject) {
+        return subjectOfferingRepository.save(SubjectOffering.builder()
+                .subject(subject).semester(s.semester)
+                .createdAt(now()).updatedAt(now()).build());
     }
 
     private Subject extraSubject(Slice s, String name) {
@@ -708,7 +734,7 @@ class M71ReportIntegrationTest {
     void teacherReport_ownSubjectOnly() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherA@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
 
         Student s1 = student(a, "Student A1");
         AttendanceSession session = saveSession(a.subject, a.section, t1, "2026-01-10", "LP1", "CONDUCTED");
@@ -733,8 +759,8 @@ class M71ReportIntegrationTest {
         Teacher t1 = createTeacherAccount("teacherA@dagacs.local", "Pass@123", a.dept);
         Teacher t2 = createTeacherAccount("teacherB@dagacs.local", "Pass@123", a.dept);
         Subject extra = extraSubject(a, "Extra Subject");
-        assign(t1, a.subject, a.section);
-        assign(t2, extra, a.section);
+        assign(t1, a.offering, a.section);
+        assign(t2, offeringFor(a, extra), a.section);
 
         Student s1 = student(a, "Student A1");
         Student s2 = student(a, "Student A2");
@@ -771,7 +797,7 @@ class M71ReportIntegrationTest {
     void teacherReport_dateFilter_inclusive() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherA@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         Student s1 = student(a, "Student A1");
         record(saveSession(a.subject, a.section, t1, "2026-01-05", "LP1", "CONDUCTED"), s1, true);
         record(saveSession(a.subject, a.section, t1, "2026-02-10", "LP1", "CONDUCTED"), s1, false);
@@ -791,7 +817,7 @@ class M71ReportIntegrationTest {
     void teacherReport_invertedRange_returns400() throws Exception {
         Slice a = slice("A");
         Teacher t1 = createTeacherAccount("teacherA@dagacs.local", "Pass@123", a.dept);
-        assign(t1, a.subject, a.section);
+        assign(t1, a.offering, a.section);
         flush();
 
         String token = login("teacherA@dagacs.local", "Pass@123");

@@ -178,7 +178,7 @@ public class AttendanceSessionService {
     }
 
     private void authorizeTeacher(Teacher teacher, Long subjectId, Long sectionId) {
-        if (!assignmentRepository.existsByTeacherIdAndSubjectIdAndSectionId(teacher.getId(), subjectId, sectionId)) {
+        if (!assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(teacher.getId(), sectionId, subjectId)) {
             throw new AuthException("Teacher is not assigned to this subject and section", 403);
         }
     }

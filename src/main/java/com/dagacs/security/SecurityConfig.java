@@ -30,13 +30,16 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
+    private final LoginRateLimitFilter loginRateLimitFilter;
     private final UserDetailsService userDetailsService;
 
     @Value("${app.cors.allowed-origins:http://localhost:5500}")
     private List<String> allowedOrigins;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtFilter, UserDetailsService userDetailsService) {
+    public SecurityConfig(JwtAuthenticationFilter jwtFilter, LoginRateLimitFilter loginRateLimitFilter,
+                          UserDetailsService userDetailsService) {
         this.jwtFilter = jwtFilter;
+        this.loginRateLimitFilter = loginRateLimitFilter;
         this.userDetailsService = userDetailsService;
     }
 
@@ -106,6 +109,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/student/**").hasRole("STUDENT")
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

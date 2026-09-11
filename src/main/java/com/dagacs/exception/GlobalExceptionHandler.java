@@ -28,8 +28,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<Map<String, String>> handleAuth(AuthException ex) {
-        return ResponseEntity.status(ex.getStatus())
-                .body(Map.of("error", "Unauthorized", "message", ex.getMessage()));
+        Map<String, String> body = new HashMap<>();
+        body.put("error", "Unauthorized");
+        body.put("message", ex.getMessage());
+        if (ex.getCode() != null) {
+            body.put("code", ex.getCode());
+        }
+        return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

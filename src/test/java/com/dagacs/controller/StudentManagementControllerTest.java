@@ -293,4 +293,102 @@ class StudentManagementControllerTest {
                         .content(VALID_BODY))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void provisionLogin_valid_returns201() throws Exception {
+        StudentManagementDTO linked = StudentManagementDTO.builder()
+                .id(1L)
+                .rollNumber("2201CE001")
+                .email("student1@dagacs.local")
+                .name("Rahul Kumar")
+                .status("ACTIVE")
+                .loginLinked(true)
+                .loginStatus("ACTIVE")
+                .build();
+        when(studentManagementService.provisionLogin(eq(1L), any())).thenReturn(linked);
+
+        mockMvc.perform(post("/api/admin/students/1/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"StuPass#1\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loginLinked").value(true))
+                .andExpect(jsonPath("$.loginStatus").value("ACTIVE"));
+        verify(studentManagementService).provisionLogin(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void provisionLogin_shortPassword_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/students/1/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+        verify(studentManagementService, never()).provisionLogin(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void setLoginStatus_returns200() throws Exception {
+        when(studentManagementService.setLoginStatus(eq(1L), eq("INACTIVE")))
+                .thenReturn(dto(1L, "2201CE001", "Rahul Kumar", "ACTIVE"));
+
+        mockMvc.perform(patch("/api/admin/students/1/login/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rollNumber").value("2201CE001"));
+        verify(studentManagementService).setLoginStatus(1L, "INACTIVE");
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void setLoginStatus_missingStatus_returns400() throws Exception {
+        mockMvc.perform(patch("/api/admin/students/1/login/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        verify(studentManagementService, never()).setLoginStatus(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void setLoginPassword_returns200() throws Exception {
+        when(studentManagementService.setLoginPassword(eq(1L), eq("NewPass#9")))
+                .thenReturn(dto(1L, "2201CE001", "Rahul Kumar", "ACTIVE"));
+
+        mockMvc.perform(put("/api/admin/students/1/login/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"NewPass#9\"}"))
+                .andExpect(status().isOk());
+        verify(studentManagementService).setLoginPassword(1L, "NewPass#9");
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void setLoginPassword_shortPassword_returns400() throws Exception {
+        mockMvc.perform(put("/api/admin/students/1/login/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+        verify(studentManagementService, never()).setLoginPassword(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void provisionLogin_nonAdmin_returns403() throws Exception {
+        mockMvc.perform(post("/api/admin/students/1/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"StuPass#1\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void setLoginPassword_noToken_returns401() throws Exception {
+        mockMvc.perform(put("/api/admin/students/1/login/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"NewPass#9\"}"))
+                .andExpect(status().isUnauthorized());
+    }
 }

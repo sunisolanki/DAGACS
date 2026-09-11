@@ -1,5 +1,6 @@
 package com.dagacs.dto;
 
+import com.dagacs.validation.ValidAttendanceDate;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,6 +21,7 @@ public class AttendanceSessionUpdateRequestDTO {
 
     @NotBlank(message = "Date is required")
     @Size(max = 20, message = "Date must not exceed 20 characters")
+    @ValidAttendanceDate
     private String date;
 
     @NotBlank(message = "Status is required")

@@ -1,9 +1,10 @@
 package com.dagacs.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,8 +15,18 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 public class AdminController {
 
+    private final boolean diagnosticsEnabled;
+
+    public AdminController(@Value("${app.diagnostics.enabled:true}") boolean diagnosticsEnabled) {
+        this.diagnosticsEnabled = diagnosticsEnabled;
+    }
+
     @GetMapping("/test")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> test() {
+        if (!diagnosticsEnabled) {
+            return ResponseEntity.notFound().build();
+        }
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = "anonymous";
         if (auth != null && auth.getAuthorities() != null) {
