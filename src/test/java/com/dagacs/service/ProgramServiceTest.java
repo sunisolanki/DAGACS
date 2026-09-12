@@ -149,4 +149,77 @@ class ProgramServiceTest {
         verify(programRepository).save(captor.capture());
         assertEquals("", captor.getValue().getDescription());
     }
+
+    @Test
+    void updateProgram_differentDepartmentWithSessions_returns409_notSaved() {
+        Department cse = Department.builder().id(1L).name("CSE").code("CS").build();
+        Department ece = Department.builder().id(2L).name("ECE").code("EC").build();
+        Program existing = Program.builder()
+                .id(1L).name("M.Tech CSE").code("MTCSE").duration("2 years")
+                .description("").department(cse).build();
+        when(programRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(departmentRepository.findById(2L)).thenReturn(Optional.of(ece));
+        when(academicSessionRepository.existsByProgramId(1L)).thenReturn(true);
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(2L);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> programService.updateProgram(1L, dto));
+        assertEquals(409, ex.getStatus());
+        verify(programRepository, never()).save(any());
+        assertEquals(cse, existing.getDepartment());
+    }
+
+    @Test
+    void updateProgram_sameDepartmentWithSessions_allowed() {
+        Department cse = Department.builder().id(1L).name("CSE").code("CS").build();
+        Program existing = Program.builder()
+                .id(1L).name("M.Tech CSE").code("MTCSE").duration("2 years")
+                .description("old").department(cse).build();
+        when(programRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(departmentRepository.findById(1L)).thenReturn(Optional.of(cse));
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(1L);
+        dto.setDescription("new");
+
+        ProgramDTO result = programService.updateProgram(1L, dto);
+
+        assertEquals("new", result.getDescription());
+        verify(programRepository).save(any(Program.class));
+        verify(academicSessionRepository, never()).existsByProgramId(any());
+    }
+
+    @Test
+    void updateProgram_differentDepartmentNoSessions_allowed() {
+        Department cse = Department.builder().id(1L).name("CSE").code("CS").build();
+        Department ece = Department.builder().id(2L).name("ECE").code("EC").build();
+        Program existing = Program.builder()
+                .id(1L).name("M.Tech CSE").code("MTCSE").duration("2 years")
+                .description("").department(cse).build();
+        when(programRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(departmentRepository.findById(2L)).thenReturn(Optional.of(ece));
+        when(academicSessionRepository.existsByProgramId(1L)).thenReturn(false);
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramDTO dto = new ProgramDTO();
+        dto.setName("M.Tech CSE");
+        dto.setCode("MTCSE");
+        dto.setDuration("2 years");
+        dto.setDepartmentId(2L);
+
+        ProgramDTO result = programService.updateProgram(1L, dto);
+
+        assertEquals(2L, result.getDepartment().getId());
+        assertEquals(ece, existing.getDepartment());
+        verify(programRepository).save(any(Program.class));
+    }
 }

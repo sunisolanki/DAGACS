@@ -33,4 +33,13 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
     boolean existsBySessionIdAndStudentId(Long sessionId, Long studentId);
 
     boolean existsBySessionId(Long sessionId);
+
+    /**
+     * M9.15: teacher-scoped historical-attendance guard covering the "marked
+     * by" dimension. Answers "did this teacher mark an attendance record in
+     * this subject + section context?" Scoped by {markedBy, subject, section}
+     * so co-teacher assignments stay independent.
+     */
+    boolean existsByMarkedByIdAndSubjectIdAndSectionId(
+            Long teacherId, Long subjectId, Long sectionId);
 }

@@ -88,6 +88,12 @@ public class ProgramService {
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new AuthException("Department not found with ID: " + departmentId, 404));
 
+        boolean departmentChanged = !program.getDepartment().getId().equals(departmentId);
+        if (departmentChanged && academicSessionRepository.existsByProgramId(program.getId())) {
+            throw new AuthException(
+                    "Cannot move program to a different department while academic sessions exist", 409);
+        }
+
         program.setName(programDTO.getName());
         program.setCode(programDTO.getCode());
         program.setDuration(programDTO.getDuration());

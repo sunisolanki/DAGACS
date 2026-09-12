@@ -21,11 +21,13 @@ com\dagacs\controller\HodAnalyticsController.class
 com\dagacs\entity\Semester.class
 com\dagacs\dto\AttendanceMarkItemDTO.class
 com\dagacs\dto\TeacherPasswordUpdateRequestDTO.class
+com\dagacs\service\StudentImportService.class
 com\dagacs\export\ExportFormat.class
 com\dagacs\dto\StudentManagementRequestDTO.class
 com\dagacs\controller\HodReportController.class
 com\dagacs\dto\StudentManagementDTO.class
 com\dagacs\dto\TeacherCreateRequestDTO$TeacherCreateRequestDTOBuilder.class
+com\dagacs\controller\StudentImportController.class
 com\dagacs\entity\AcademicSession.class
 com\dagacs\dto\TeacherLoginRequestDTO.class
 com\dagacs\dto\StudentManagementRequestDTO$StudentManagementRequestDTOBuilder.class
@@ -48,6 +50,7 @@ com\dagacs\dto\AttendanceSessionDTO$AttendanceSessionDTOBuilder.class
 com\dagacs\repository\HodReportRepository$HodCoverageAggregation.class
 com\dagacs\dto\SubjectDTO$SubjectDTOBuilder.class
 com\dagacs\dto\HodAuditLogEntryDTO.class
+com\dagacs\dto\StudentImportResult$RowError.class
 com\dagacs\dto\AttendanceRecordDTO.class
 com\dagacs\entity\AcademicSession$AcademicSessionBuilder.class
 com\dagacs\security\JwtAuthenticationFilter.class
@@ -139,7 +142,9 @@ com\dagacs\dto\SemesterDTO$SemesterDTOBuilder.class
 com\dagacs\dto\HodLowAttendanceDTO.class
 com\dagacs\entity\Program.class
 com\dagacs\dto\AttendanceMarkItemDTO$AttendanceMarkItemDTOBuilder.class
+com\dagacs\dto\StudentImportResult.class
 com\dagacs\repository\RoleRepository.class
+com\dagacs\dto\StudentImportResult$RowError$RowErrorBuilder.class
 com\dagacs\repository\AttendanceRecordAggregationRepository.class
 com\dagacs\dto\TeacherAssignmentRequestDTO$TeacherAssignmentRequestDTOBuilder.class
 com\dagacs\repository\ProgramRepository.class
@@ -181,6 +186,7 @@ com\dagacs\entity\AttendanceRecord$AttendanceRecordBuilder.class
 com\dagacs\security\AuthenticatedTeacherResolver.class
 com\dagacs\dto\TeacherLoginStatusDTO.class
 com\dagacs\dto\ProgramDTO.class
+com\dagacs\studentimport\StudentImportParser$StudentImportRow.class
 com\dagacs\entity\Teacher$TeacherBuilder.class
 com\dagacs\entity\Section$SectionBuilder.class
 com\dagacs\dto\TeacherAssignmentDTO$TeacherAssignmentDTOBuilder.class
@@ -198,7 +204,9 @@ com\dagacs\security\LoginRateLimitFilter.class
 com\dagacs\DagacsApplication.class
 com\dagacs\dto\HodDailyLectureReportDTO.class
 com\dagacs\entity\Role$RoleBuilder.class
+com\dagacs\dto\StudentImportResult$StudentImportResultBuilder.class
 com\dagacs\controller\ProgramController.class
+com\dagacs\studentimport\StudentImportParser.class
 com\dagacs\repository\TeacherReportRepository$TeacherSubjectAggregation.class
 com\dagacs\dto\TeacherUpdateRequestDTO$TeacherUpdateRequestDTOBuilder.class
 com\dagacs\controller\SemesterController.class

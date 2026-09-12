@@ -6,6 +6,7 @@ import com.dagacs.entity.Semester;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.SemesterRepository;
+import com.dagacs.repository.SubjectOfferingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,9 @@ class SemesterServiceTest {
 
     @Mock
     private AcademicSessionRepository academicSessionRepository;
+
+    @Mock
+    private SubjectOfferingRepository subjectOfferingRepository;
 
     @InjectMocks
     private SemesterService semesterService;
@@ -138,6 +142,71 @@ class SemesterServiceTest {
         List<SemesterDTO> result = semesterService.getSemestersBySession(1L);
         assertEquals(1, result.size());
         assertEquals("Semester 1", result.get(0).getName());
+    }
+
+    @Test
+    void updateSemester_differentSessionWithOfferings_returns409_notSaved() {
+        Semester semester = buildSemester();
+        AcademicSession other = AcademicSession.builder().id(2L).name("2027-28").code("2027-28").build();
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(other));
+        when(subjectOfferingRepository.existsBySemesterId(1L)).thenReturn(true);
+
+        SemesterDTO dto = validSemesterDTO();
+        dto.setAcademicSessionId(2L);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> semesterService.updateSemester(1L, dto));
+        assertEquals(409, ex.getStatus());
+        verify(semesterRepository, never()).save(any());
+        assertEquals(academicSession, semester.getAcademicSession());
+    }
+
+    @Test
+    void updateSemester_sameSessionWithOfferings_allowed() {
+        Semester semester = buildSemester();
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(academicSession));
+        when(semesterRepository.save(any(Semester.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SemesterDTO dto = validSemesterDTO();
+
+        SemesterDTO result = semesterService.updateSemester(1L, dto);
+
+        assertEquals(1L, result.getAcademicSessionId());
+        verify(semesterRepository).save(any(Semester.class));
+        verify(subjectOfferingRepository, never()).existsBySemesterId(any());
+    }
+
+    @Test
+    void updateSemester_differentSessionNoOfferings_allowed() {
+        Semester semester = buildSemester();
+        AcademicSession other = AcademicSession.builder().id(2L).name("2027-28").code("2027-28").build();
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(other));
+        when(subjectOfferingRepository.existsBySemesterId(1L)).thenReturn(false);
+        when(semesterRepository.save(any(Semester.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SemesterDTO dto = validSemesterDTO();
+        dto.setAcademicSessionId(2L);
+
+        SemesterDTO result = semesterService.updateSemester(1L, dto);
+
+        assertEquals(2L, result.getAcademicSessionId());
+        assertEquals(other, semester.getAcademicSession());
+        verify(semesterRepository).save(any(Semester.class));
+    }
+
+    @Test
+    void deleteSemester_withOfferings_returns409_notDeleted() {
+        Semester semester = buildSemester();
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
+        when(subjectOfferingRepository.existsBySemesterId(1L)).thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> semesterService.deleteSemester(1L));
+        assertEquals(409, ex.getStatus());
+        verify(semesterRepository, never()).delete(any());
     }
 
     @Test

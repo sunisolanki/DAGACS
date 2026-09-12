@@ -181,6 +181,25 @@ public class StudentManagementService {
         return convertToDTO(student);
     }
 
+    /**
+     * M9.10 import-only pre-persist validation.
+     * <p>
+     * Runs the exact same normalization, reference-resolution, uniqueness and
+     * academic-consistency checks {@link #createStudent(StudentManagementRequestDTO)}
+     * performs, <b>without persisting anything</b>. Used by
+     * {@link com.dagacs.service.StudentImportService} so a bulk batch can be
+     * fully validated before any row is saved (all-or-nothing import). This is
+     * intentionally the single validation path - bulk import must never diverge
+     * from single-student creation semantics.
+     * </p>
+     */
+    public void assertValidForCreate(StudentManagementRequestDTO request) {
+        Student student = applyFields(new Student(), request);
+        normalizeStatus(request.getStatus());
+        ensureUniqueOnCreate(request);
+        assertAcademicConsistency(student);
+    }
+
     private Student applyFields(Student student, StudentManagementRequestDTO request) {
         String rollNumber = trimToNull(request.getRollNumber());
         if (rollNumber == null) {
@@ -244,9 +263,9 @@ public class StudentManagementService {
     }
 
     private void assertAcademicConsistency(Student student) {
-        String programName = student.getProgram().getName();
-        String batchProgram = student.getBatch().getAcademicSession().getProgram().getName();
-        if (!programName.equals(batchProgram)) {
+        Long programId = student.getProgram().getId();
+        Long batchProgramId = student.getBatch().getAcademicSession().getProgram().getId();
+        if (!programId.equals(batchProgramId)) {
             throw new AuthException(
                     "Student program does not match batch academic session program", 400);
         }

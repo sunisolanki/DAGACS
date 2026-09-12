@@ -21,6 +21,10 @@ public interface TeacherSubjectSectionAssignmentRepository extends JpaRepository
 
     boolean existsByTeacherIdAndSubjectOfferingIdAndSectionId(Long teacherId, Long subjectOfferingId, Long sectionId);
 
+    boolean existsBySectionId(Long sectionId);
+
+    boolean existsBySectionBatchId(Long batchId);
+
     Optional<TeacherSubjectSectionAssignment> findByTeacherIdAndSubjectOfferingIdAndSectionId(
             Long teacherId, Long subjectOfferingId, Long sectionId);
 

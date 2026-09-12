@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -677,6 +678,48 @@ class StudentManagementServiceTest {
 
         AuthException ex = assertThrows(AuthException.class, () -> service.updateStudent(1L, validRequest()));
         assertEquals(400, ex.getStatus());
+        verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    void createStudent_sameProgramIdDifferentNames_accepted() {
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        AcademicSession sameIdSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28")
+                .program(Program.builder().id(1L).name("B.Tech CSE").build())
+                .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(
+                Batch.builder().id(1L).batchCode("B-2026").name("B1")
+                        .year(2026).academicSession(sameIdSession).program("B.Tech CSE").build()));
+        stubTeacherNoCollision();
+        stubNoLinkedLogin();
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StudentManagementDTO result = service.createStudent(validRequest());
+
+        assertNotNull(result);
+        assertEquals("2201CE001", result.getRollNumber());
+        verify(studentRepository).save(any(Student.class));
+    }
+
+    @Test
+    void createStudent_differentProgramIdsSameName_returns400() {
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        AcademicSession otherIdSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28")
+                .program(Program.builder().id(2L).name("Computer Science").build())
+                .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(
+                Batch.builder().id(1L).batchCode("B-2026").name("B1")
+                        .year(2026).academicSession(otherIdSession).program("Computer Science").build()));
+
+        AuthException ex = assertThrows(AuthException.class, () -> service.createStudent(validRequest()));
+        assertEquals(400, ex.getStatus());
+        assertTrue(ex.getMessage().contains("program"));
         verify(studentRepository, never()).save(any());
     }
 }

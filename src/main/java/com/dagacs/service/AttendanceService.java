@@ -32,6 +32,7 @@ public class AttendanceService {
 
     private static final String STATUS_PRESENT = "PRESENT";
     private static final String STATUS_ABSENT = "ABSENT";
+    private static final String STATUS_ACTIVE = "ACTIVE";
 
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
@@ -116,6 +117,10 @@ public class AttendanceService {
                     || !student.getSection().getId().equals(sessionSection.getId())) {
                 throw new AuthException(
                         "Student " + item.getStudentId() + " does not belong to the session's section", 400);
+            }
+            if (!STATUS_ACTIVE.equals(student.getStatus())) {
+                throw new AuthException(
+                        "Student " + student.getRollNumber() + " is inactive and cannot be marked for attendance", 400);
             }
             if (attendanceRecordRepository.existsBySessionIdAndStudentId(
                     session.getId(), item.getStudentId())) {

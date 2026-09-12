@@ -242,6 +242,28 @@ class AttendanceControllerTest {
 
     @Test
     @WithMockUser(roles = "TEACHER")
+    void createSession_impossibleCalendarDate_returns400() throws Exception {
+        mockMvc.perform(post("/api/teacher/attendance/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subjectId\":1,\"sectionId\":1,\"lecturePeriod\":\"1st\",\"date\":\"2024-02-31\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    void createSession_futureDate_returns400() throws Exception {
+        when(sessionService.createSession(any(AttendanceSessionCreateRequestDTO.class)))
+                .thenThrow(new AuthException("Attendance date cannot be in the future", 400));
+
+        mockMvc.perform(post("/api/teacher/attendance/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subjectId\":1,\"sectionId\":1,\"lecturePeriod\":\"1st\",\"date\":\"2026-12-31\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Attendance date cannot be in the future"));
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
     void updateSession_invalidDate_returns400() throws Exception {
         mockMvc.perform(put("/api/teacher/attendance/sessions/1")
                         .contentType(MediaType.APPLICATION_JSON)

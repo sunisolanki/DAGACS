@@ -193,6 +193,60 @@ class AcademicSessionServiceTest {
     }
 
     @Test
+    void updateSession_differentProgramWithBatches_returns409_notSaved() {
+        AcademicSession existing = buildSession();
+        Program other = Program.builder().id(2L).name("Electronics").code("EL").build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(programRepository.findById(2L)).thenReturn(Optional.of(other));
+        when(batchRepository.existsByAcademicSessionId(1L)).thenReturn(true);
+
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setProgramId(2L);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> academicSessionService.updateSession(1L, dto));
+        assertEquals(409, ex.getStatus());
+        verify(academicSessionRepository, never()).save(any());
+        assertEquals(program, existing.getProgram());
+    }
+
+    @Test
+    void updateSession_sameProgramWithBatches_allowed() {
+        AcademicSession existing = buildSession();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.save(any(AcademicSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setDescription("Renamed");
+
+        AcademicSessionDTO result = academicSessionService.updateSession(1L, dto);
+
+        assertEquals("Renamed", result.getDescription());
+        verify(academicSessionRepository).save(any(AcademicSession.class));
+        verify(batchRepository, never()).existsByAcademicSessionId(any());
+    }
+
+    @Test
+    void updateSession_differentProgramNoBatches_allowed() {
+        AcademicSession existing = buildSession();
+        Program other = Program.builder().id(2L).name("Electronics").code("EL").build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(programRepository.findById(2L)).thenReturn(Optional.of(other));
+        when(batchRepository.existsByAcademicSessionId(1L)).thenReturn(false);
+        when(academicSessionRepository.save(any(AcademicSession.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AcademicSessionDTO dto = validSessionDTO();
+        dto.setProgramId(2L);
+
+        AcademicSessionDTO result = academicSessionService.updateSession(1L, dto);
+
+        assertEquals(2L, result.getProgramId());
+        assertEquals(other, existing.getProgram());
+        verify(academicSessionRepository).save(any(AcademicSession.class));
+    }
+
+    @Test
     void getSessionById_missing_returns404() {
         when(academicSessionRepository.findById(5L)).thenReturn(Optional.empty());
 

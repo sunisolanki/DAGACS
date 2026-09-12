@@ -5,6 +5,8 @@ import com.dagacs.dto.TeacherAssignmentRequestDTO;
 import com.dagacs.dto.TeacherDTO;
 import com.dagacs.entity.*;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AttendanceRecordRepository;
+import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.SubjectOfferingRepository;
 import com.dagacs.repository.TeacherRepository;
@@ -38,6 +40,12 @@ class TeacherAssignmentServiceTest {
 
     @Mock
     private SectionRepository sectionRepository;
+
+    @Mock
+    private AttendanceSessionRepository attendanceSessionRepository;
+
+    @Mock
+    private AttendanceRecordRepository attendanceRecordRepository;
 
     @InjectMocks
     private TeacherAssignmentService teacherAssignmentService;
@@ -289,5 +297,148 @@ class TeacherAssignmentServiceTest {
         assertEquals(2L, result.get(0).getId());
         assertEquals("Teacher Two", result.get(0).getFullName());
         assertNull(result.get(0).getDepartmentName());
+    }
+
+    // ---------- M9.15 Assignment Lifecycle Integrity Hardening ----------
+
+    @Test
+    void createAssignment_inactiveTeacher_returns409() {
+        Teacher inactive = Teacher.builder().id(3L).email("inactive@dagacs.local")
+                .fullName("Inactive Teacher").status("INACTIVE").build();
+        when(teacherRepository.findById(3L)).thenReturn(Optional.of(inactive));
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.createAssignment(request(3L, 60L, 80L)));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot assign an inactive teacher.", ex.getMessage());
+        verify(assignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void updateAssignment_keepSameInactiveTeacher_noInactiveGuard() {
+        Teacher inactive = Teacher.builder().id(3L).email("inactive@dagacs.local")
+                .fullName("Inactive Teacher").status("INACTIVE").build();
+        assignment.setTeacher(inactive);
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(teacherRepository.findById(3L)).thenReturn(Optional.of(inactive));
+        when(subjectOfferingRepository.findById(60L)).thenReturn(Optional.of(offering));
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
+        when(assignmentRepository.findByTeacherIdAndSubjectOfferingIdAndSectionId(3L, 60L, 80L))
+                .thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(TeacherSubjectSectionAssignment.class))).thenAnswer(inv -> {
+            TeacherSubjectSectionAssignment saved = inv.getArgument(0);
+            saved.setId(90L);
+            return saved;
+        });
+
+        TeacherAssignmentDTO result = teacherAssignmentService.updateAssignment(90L, request(3L, 60L, 80L));
+
+        assertEquals(90L, result.getId());
+        assertEquals(3L, result.getTeacherId());
+        verify(assignmentRepository).save(any(TeacherSubjectSectionAssignment.class));
+    }
+
+    @Test
+    void updateAssignment_changeToInactiveTeacher_returns409() {
+        Teacher inactive = Teacher.builder().id(3L).email("inactive@dagacs.local")
+                .fullName("Inactive Teacher").status("INACTIVE").build();
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(teacherRepository.findById(3L)).thenReturn(Optional.of(inactive));
+        when(subjectOfferingRepository.findById(60L)).thenReturn(Optional.of(offering));
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.updateAssignment(90L, request(3L, 60L, 80L)));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot assign an inactive teacher.", ex.getMessage());
+        verify(assignmentRepository, never()).save(any());
+        assertEquals(1L, assignment.getTeacher().getId(), "Assignment must stay untouched after rejection");
+    }
+
+    @Test
+    void updateAssignment_teacherChangeWithSessions_returns409() {
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(teacherRepository.findById(2L)).thenReturn(Optional.of(teacher2));
+        when(subjectOfferingRepository.findById(60L)).thenReturn(Optional.of(offering));
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
+        when(assignmentRepository.findByTeacherIdAndSubjectOfferingIdAndSectionId(2L, 60L, 80L))
+                .thenReturn(Optional.empty());
+        when(attendanceSessionRepository.existsByTeacherEntityIdAndSubjectEntityIdAndSectionEntityId(1L, 30L, 80L))
+                .thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.updateAssignment(90L, request(2L, 60L, 80L)));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot change assignment teacher while attendance history exists.", ex.getMessage());
+        verify(assignmentRepository, never()).save(any());
+        assertEquals(1L, assignment.getTeacher().getId(), "Assignment teacher must stay untouched");
+    }
+
+    @Test
+    void updateAssignment_contextChangeWithRecords_returns409() {
+        SubjectOffering offering2 = SubjectOffering.builder().id(61L).subject(subject).semester(semester).build();
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher1));
+        when(subjectOfferingRepository.findById(61L)).thenReturn(Optional.of(offering2));
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
+        when(assignmentRepository.findByTeacherIdAndSubjectOfferingIdAndSectionId(1L, 61L, 80L))
+                .thenReturn(Optional.empty());
+        when(attendanceRecordRepository.existsByMarkedByIdAndSubjectIdAndSectionId(1L, 30L, 80L))
+                .thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.updateAssignment(90L, request(1L, 61L, 80L)));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot change assignment context while attendance history exists.", ex.getMessage());
+        verify(assignmentRepository, never()).save(any());
+        assertEquals(60L, assignment.getSubjectOffering().getId(), "Assignment context must stay untouched");
+    }
+
+    @Test
+    void updateAssignment_contextChange_noHistory_allowed() {
+        SubjectOffering offering2 = SubjectOffering.builder().id(61L).subject(subject).semester(semester).build();
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher1));
+        when(subjectOfferingRepository.findById(61L)).thenReturn(Optional.of(offering2));
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
+        when(assignmentRepository.findByTeacherIdAndSubjectOfferingIdAndSectionId(1L, 61L, 80L))
+                .thenReturn(Optional.empty());
+        when(assignmentRepository.save(any(TeacherSubjectSectionAssignment.class))).thenAnswer(inv -> {
+            TeacherSubjectSectionAssignment saved = inv.getArgument(0);
+            saved.setId(90L);
+            return saved;
+        });
+
+        TeacherAssignmentDTO result = teacherAssignmentService.updateAssignment(90L, request(1L, 61L, 80L));
+
+        assertEquals(90L, result.getId());
+        assertEquals(61L, result.getSubjectOfferingId());
+        verify(assignmentRepository).save(any(TeacherSubjectSectionAssignment.class));
+    }
+
+    @Test
+    void deleteAssignment_withSessions_returns409() {
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(attendanceSessionRepository.existsByTeacherEntityIdAndSubjectEntityIdAndSectionEntityId(1L, 30L, 80L))
+                .thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.deleteAssignment(90L));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot delete assignment while attendance history exists.", ex.getMessage());
+        verify(assignmentRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteAssignment_withRecords_returns409() {
+        when(assignmentRepository.findById(90L)).thenReturn(Optional.of(assignment));
+        when(attendanceRecordRepository.existsByMarkedByIdAndSubjectIdAndSectionId(1L, 30L, 80L))
+                .thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> teacherAssignmentService.deleteAssignment(90L));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot delete assignment while attendance history exists.", ex.getMessage());
+        verify(assignmentRepository, never()).delete(any());
     }
 }

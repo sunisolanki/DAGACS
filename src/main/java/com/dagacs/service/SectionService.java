@@ -10,6 +10,8 @@ import com.dagacs.repository.AttendanceRecordRepository;
 import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,16 +27,22 @@ public class SectionService {
     private final BatchRepository batchRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
     private final AttendanceRecordRepository attendanceRecordRepository;
+    private final StudentRepository studentRepository;
+    private final TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository;
 
     @Autowired
     public SectionService(SectionRepository sectionRepository,
                           BatchRepository batchRepository,
                           AttendanceSessionRepository attendanceSessionRepository,
-                          AttendanceRecordRepository attendanceRecordRepository) {
+                          AttendanceRecordRepository attendanceRecordRepository,
+                          StudentRepository studentRepository,
+                          TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository) {
         this.sectionRepository = sectionRepository;
         this.batchRepository = batchRepository;
         this.attendanceSessionRepository = attendanceSessionRepository;
         this.attendanceRecordRepository = attendanceRecordRepository;
+        this.studentRepository = studentRepository;
+        this.teacherSubjectSectionAssignmentRepository = teacherSubjectSectionAssignmentRepository;
     }
 
     @Transactional
@@ -121,6 +129,17 @@ public class SectionService {
         if ((!section.getName().equals(name) || !section.getBatch().getId().equals(batchId))
                 && sectionRepository.existsByNameAndBatch(name, batch)) {
             throw new AuthException("Section already exists in this batch: " + name, 409);
+        }
+
+        boolean batchChanged = !batch.getId().equals(section.getBatch().getId());
+        if (batchChanged) {
+            boolean hasStudents = studentRepository.countBySectionId(section.getId()) > 0;
+            boolean hasAssignments = teacherSubjectSectionAssignmentRepository.existsBySectionId(section.getId());
+            if (hasStudents || hasAssignments) {
+                throw new AuthException(
+                        "Cannot move a section to a different batch while students or teacher assignments exist",
+                        409);
+            }
         }
 
         section.setSectionCode(sectionCode);

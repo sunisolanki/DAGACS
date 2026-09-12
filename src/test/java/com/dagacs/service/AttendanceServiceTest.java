@@ -70,8 +70,8 @@ class AttendanceServiceTest {
         session = AttendanceSession.builder().id(10L)
                 .subjectEntity(subject).sectionEntity(section).teacherEntity(teacher)
                 .lecturePeriod("1st").date("2026-09-04").status("CONDUCTED").build();
-        student1 = Student.builder().id(1L).rollNumber("R1").name("S1").section(section).build();
-        student2 = Student.builder().id(2L).rollNumber("R2").name("S2").section(section).build();
+        student1 = Student.builder().id(1L).rollNumber("R1").name("S1").section(section).status("ACTIVE").build();
+        student2 = Student.builder().id(2L).rollNumber("R2").name("S2").section(section).status("ACTIVE").build();
     }
 
     private AttendanceMarkRequestDTO validRequest() {
@@ -118,7 +118,7 @@ class AttendanceServiceTest {
     @Test
     void markAttendance_wrongSectionStudent_returns400() {
         Student other = Student.builder().id(3L).rollNumber("R3").name("S3")
-                .section(Section.builder().id(99L).name("CSE-B").build()).build();
+                .section(Section.builder().id(99L).name("CSE-B").build()).status("ACTIVE").build();
         AttendanceMarkRequestDTO request = AttendanceMarkRequestDTO.builder()
                 .sessionId(10L)
                 .items(List.of(new AttendanceMarkItemDTO(3L, "PRESENT")))
@@ -132,6 +132,51 @@ class AttendanceServiceTest {
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceService.markAttendance(request));
         assertEquals(400, ex.getStatus());
+        verify(attendanceRecordRepository, never()).save(any());
+    }
+
+    @Test
+    void markAttendance_inactiveStudent_returns400() {
+        Student inactive = Student.builder().id(9L).rollNumber("R9").name("S9")
+                .section(section).status("INACTIVE").build();
+        AttendanceMarkRequestDTO request = AttendanceMarkRequestDTO.builder()
+                .sessionId(10L)
+                .items(List.of(new AttendanceMarkItemDTO(9L, "PRESENT")))
+                .build();
+
+        when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(studentRepository.findAllById(List.of(9L))).thenReturn(List.of(inactive));
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> attendanceService.markAttendance(request));
+        assertEquals(400, ex.getStatus());
+        assertTrue(ex.getMessage().contains("R9"));
+        assertTrue(ex.getMessage().contains("is inactive"));
+        verify(attendanceRecordRepository, never()).save(any());
+    }
+
+    @Test
+    void markAttendance_batchWithInactiveStudent_rollsBackAll() {
+        Student inactive = Student.builder().id(8L).rollNumber("R8").name("S8")
+                .section(section).status("INACTIVE").build();
+        AttendanceMarkRequestDTO request = AttendanceMarkRequestDTO.builder()
+                .sessionId(10L)
+                .items(List.of(
+                        new AttendanceMarkItemDTO(1L, "PRESENT"),
+                        new AttendanceMarkItemDTO(8L, "ABSENT")))
+                .build();
+
+        when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(studentRepository.findAllById(List.of(1L, 8L))).thenReturn(List.of(student1, inactive));
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> attendanceService.markAttendance(request));
+        assertEquals(400, ex.getStatus());
+        assertTrue(ex.getMessage().contains("R8"));
         verify(attendanceRecordRepository, never()).save(any());
     }
 
@@ -273,5 +318,30 @@ class AttendanceServiceTest {
         AuthException ex = assertThrows(AuthException.class,
                 () -> attendanceService.updateAttendance(99L, dto));
         assertEquals(404, ex.getStatus());
+    }
+
+    @Test
+    void updateAttendance_historicalRecordOfInactiveStudent_remainsCorrigible() {
+        Student inactive = Student.builder().id(9L).rollNumber("R9").name("S9")
+                .section(section).status("INACTIVE").build();
+        AttendanceRecord record = AttendanceRecord.builder().id(5L)
+                .session(session).student(inactive).markedBy(teacher)
+                .subject(subject).section(section)
+                .status("ABSENT").lecturePeriod("1st").date("2026-09-04")
+                .isPresent(false).build();
+        when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(attendanceRecordRepository.save(any(AttendanceRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(auditLogService.recordChange(any(), anyString(), anyString(), anyString(), any()))
+                .thenReturn(null);
+
+        AttendanceUpdateRequestDTO dto = AttendanceUpdateRequestDTO.builder()
+                .newStatus("PRESENT").reason("doc").build();
+        AttendanceRecordDTO result = attendanceService.updateAttendance(5L, dto);
+
+        assertEquals("PRESENT", result.getStatus());
+        assertTrue(result.getIsPresent());
+        verify(auditLogService).recordChange(record, "ABSENT", "PRESENT", teacher.getFullName(), "doc");
     }
 }

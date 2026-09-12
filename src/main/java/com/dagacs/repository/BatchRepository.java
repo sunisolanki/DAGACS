@@ -15,4 +15,5 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
     List<Batch> findAllByOrderByName();
     boolean existsByBatchCode(String batchCode);
     boolean existsByAcademicSessionAndName(AcademicSession academicSession, String name);
+    boolean existsByAcademicSessionId(Long academicSessionId);
 }

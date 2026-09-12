@@ -3,12 +3,18 @@ package com.dagacs.service;
 import com.dagacs.dto.HodDesignationRequestDTO;
 import com.dagacs.dto.HodIdentityDTO;
 import com.dagacs.entity.Department;
+import com.dagacs.entity.Role;
 import com.dagacs.entity.Teacher;
+import com.dagacs.entity.User;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.DepartmentRepository;
+import com.dagacs.repository.RoleRepository;
 import com.dagacs.repository.TeacherRepository;
+import com.dagacs.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,16 +56,28 @@ import java.time.LocalDateTime;
 @Service
 public class HodDesignationService {
 
+    private static final Logger log = LoggerFactory.getLogger(HodDesignationService.class);
+
+    private static final String ROLE_HOD = "HOD";
+    private static final String ROLE_TEACHER = "TEACHER";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+
     private final TeacherRepository teacherRepository;
     private final DepartmentRepository departmentRepository;
     private final EntityManager entityManager;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
 
     public HodDesignationService(TeacherRepository teacherRepository,
                                  DepartmentRepository departmentRepository,
-                                 EntityManager entityManager) {
+                                 EntityManager entityManager,
+                                 UserRepository userRepository,
+                                 RoleRepository roleRepository) {
         this.teacherRepository = teacherRepository;
         this.departmentRepository = departmentRepository;
         this.entityManager = entityManager;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
     }
 
     /**
@@ -118,6 +136,7 @@ public class HodDesignationService {
         teacher.setIsHod(true);
         teacher.setUpdatedAt(LocalDateTime.now());
         teacherRepository.save(teacher);
+        syncRoleOnDesignate(teacher);
         return toIdentityDTO(teacher);
     }
 
@@ -130,7 +149,60 @@ public class HodDesignationService {
             teacher.setUpdatedAt(LocalDateTime.now());
             teacherRepository.save(teacher);
         }
+        // M9.8 (D2): demotion is independent of wasHod so a drifted
+        // isHod=false / role=HOD state is self-healed on every clear.
+        syncRoleOnClear(teacher);
         return toIdentityDTO(teacher);
+    }
+
+    /**
+     * M9.8: keeps a linked login's role consistent when a teacher is designated
+     * HOD. The promotion is gated on both the teacher profile and the linked
+     * login being ACTIVE (D1): an inactive account is never escalated, never
+     * reactivated, and never crashes the designation. A teacher with no linked
+     * login is designated normally and only warning-logged (D3).
+     */
+    private void syncRoleOnDesignate(Teacher teacher) {
+        if (!STATUS_ACTIVE.equals(teacher.getStatus())) {
+            log.info("HOD designation for teacher [{}] skipped role promotion: teacher profile is not ACTIVE",
+                    teacher.getId());
+            return;
+        }
+        userRepository.findByEmail(emailOf(teacher)).ifPresentOrElse(user -> {
+            if (!STATUS_ACTIVE.equals(user.getStatus())) {
+                log.info("HOD designation for teacher [{}] skipped role promotion: linked login is not ACTIVE",
+                        teacher.getId());
+                return;
+            }
+            applyRole(user, ROLE_HOD);
+        }, () -> log.warn("HOD designation for teacher [{}] has no linked login account; User role not updated",
+                teacher.getId()));
+    }
+
+    /**
+     * M9.8 (D2): restores the linked login's TEACHER role on every clear,
+     * independent of the previous flag value, so parity heals even when the role
+     * had drifted to HOD without the flag.
+     */
+    private void syncRoleOnClear(Teacher teacher) {
+        userRepository.findByEmail(emailOf(teacher)).ifPresentOrElse(
+                user -> applyRole(user, ROLE_TEACHER),
+                () -> log.warn("Clearing HOD designation for teacher [{}] has no linked login account; User role left unchanged",
+                        teacher.getId()));
+    }
+
+    private void applyRole(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new AuthException("Required role is not configured: " + roleName, 500));
+        if (!roleName.equals(user.getRole().getName())) {
+            user.setRole(role);
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+        }
+    }
+
+    private static String emailOf(Teacher teacher) {
+        return teacher.getEmail() == null ? null : teacher.getEmail().toLowerCase();
     }
 
     private HodIdentityDTO toIdentityDTO(Teacher teacher) {

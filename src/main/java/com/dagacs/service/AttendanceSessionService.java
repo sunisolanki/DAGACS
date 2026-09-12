@@ -21,6 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +41,13 @@ public class AttendanceSessionService {
     private final StudentRepository studentRepository;
     private final AuthenticatedTeacherResolver teacherResolver;
     private final AttendanceRecordRepository attendanceRecordRepository;
+
+    private Clock clock = Clock.systemDefaultZone();
+
+    /** Test seam: pin the clock for deterministic future-date validation. */
+    void setClock(Clock clock) {
+        this.clock = clock;
+    }
 
     @Autowired
     public AttendanceSessionService(AttendanceSessionRepository attendanceSessionRepository,
@@ -68,6 +77,7 @@ public class AttendanceSessionService {
         if (dto.getDate() == null || dto.getDate().trim().isEmpty()) {
             throw new AuthException("Date is required", 400);
         }
+        rejectFutureDate(dto.getDate());
 
         Teacher teacher = teacherResolver.resolve();
 
@@ -123,7 +133,8 @@ public class AttendanceSessionService {
         Teacher teacher = teacherResolver.resolve();
         authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
 
-        List<Student> students = studentRepository.findBySectionIdOrderByNameAsc(session.getSectionEntity().getId());
+        List<Student> students = studentRepository.findBySectionIdAndStatusOrderByNameAsc(
+                session.getSectionEntity().getId(), "ACTIVE");
         return students.stream()
                 .map(s -> StudentDTO.builder()
                         .id(s.getId())
@@ -158,6 +169,9 @@ public class AttendanceSessionService {
                 || !session.getDate().equals(dto.getDate())) {
             // AttendanceRecord retains date/lecturePeriod as synchronized snapshots; changing
             // them once records exist would desynchronize the session from its records.
+            if (!session.getDate().equals(dto.getDate())) {
+                rejectFutureDate(dto.getDate());
+            }
             if (attendanceRecordRepository.existsBySessionId(session.getId())) {
                 throw new AuthException(
                         "Cannot change session date or lecture period after attendance has been recorded", 409);
@@ -180,6 +194,12 @@ public class AttendanceSessionService {
     private void authorizeTeacher(Teacher teacher, Long subjectId, Long sectionId) {
         if (!assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(teacher.getId(), sectionId, subjectId)) {
             throw new AuthException("Teacher is not assigned to this subject and section", 403);
+        }
+    }
+
+    private void rejectFutureDate(String date) {
+        if (LocalDate.parse(date).isAfter(LocalDate.now(clock))) {
+            throw new AuthException("Attendance date cannot be in the future", 400);
         }
     }
 

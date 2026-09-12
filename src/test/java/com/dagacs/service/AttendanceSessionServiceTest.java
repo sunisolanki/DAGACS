@@ -22,6 +22,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,6 +69,8 @@ class AttendanceSessionServiceTest {
         teacher = Teacher.builder().id(1L).email("t@dagacs.local").fullName("T").build();
         subject = Subject.builder().id(1L).code("CS101").name("DBMS").build();
         section = Section.builder().id(1L).sectionCode("CSE-A").name("CSE-A").build();
+        attendanceSessionService.setClock(
+                Clock.fixed(Instant.parse("2026-09-12T10:00:00Z"), ZoneOffset.UTC));
     }
 
     private AttendanceSessionCreateRequestDTO validDTO() {
@@ -142,6 +147,59 @@ class AttendanceSessionServiceTest {
     }
 
     @Test
+    void createSession_futureDate_returns400() {
+        AttendanceSessionCreateRequestDTO dto = AttendanceSessionCreateRequestDTO.builder()
+                .subjectId(1L).sectionId(1L).lecturePeriod("1st").date("2026-09-13").build();
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> attendanceSessionService.createSession(dto));
+        assertEquals(400, ex.getStatus());
+        assertEquals("Attendance date cannot be in the future", ex.getMessage());
+        verify(attendanceSessionRepository, never()).save(any());
+    }
+
+    @Test
+    void createSession_today_allowed() {
+        stubValidCreate("2026-09-12");
+        when(attendanceSessionRepository.save(any(AttendanceSession.class))).thenAnswer(inv -> {
+            AttendanceSession s = inv.getArgument(0);
+            s.setId(1L);
+            return s;
+        });
+
+        AttendanceSessionDTO result = attendanceSessionService
+                .createSession(AttendanceSessionCreateRequestDTO.builder()
+                        .subjectId(1L).sectionId(1L).lecturePeriod("1st").date("2026-09-12").build());
+        assertNotNull(result);
+        assertEquals("2026-09-12", result.getDate());
+    }
+
+    @Test
+    void createSession_backdated_allowed() {
+        stubValidCreate("2023-06-15");
+        when(attendanceSessionRepository.save(any(AttendanceSession.class))).thenAnswer(inv -> {
+            AttendanceSession s = inv.getArgument(0);
+            s.setId(1L);
+            return s;
+        });
+
+        AttendanceSessionDTO result = attendanceSessionService
+                .createSession(AttendanceSessionCreateRequestDTO.builder()
+                        .subjectId(1L).sectionId(1L).lecturePeriod("1st").date("2023-06-15").build());
+        assertNotNull(result);
+        assertEquals("2023-06-15", result.getDate());
+    }
+
+    private void stubValidCreate(String date) {
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
+                1L, 1L, date, "1st")).thenReturn(false);
+    }
+
+    @Test
     void getSessionById_valid_returnsDTO() {
         AttendanceSession session = AttendanceSession.builder().id(1L)
                 .subjectEntity(subject).sectionEntity(section).teacherEntity(teacher)
@@ -203,6 +261,19 @@ class AttendanceSessionServiceTest {
         verify(attendanceSessionRepository, never()).save(any(AttendanceSession.class));
         assertEquals("1st", s.getLecturePeriod());
         assertEquals("2026-09-04", s.getDate());
+    }
+
+    @Test
+    void updateSession_dateChange_toFuture_returns400() {
+        AttendanceSession s = session("1st", "2026-09-04");
+        when(attendanceSessionRepository.findById(1L)).thenReturn(Optional.of(s));
+        stubUpdateAuthorized();
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> attendanceSessionService.updateSession(1L, updateDTO("1st", "2026-09-13", "SCHEDULED")));
+        assertEquals(400, ex.getStatus());
+        assertEquals("Attendance date cannot be in the future", ex.getMessage());
+        verify(attendanceSessionRepository, never()).save(any(AttendanceSession.class));
     }
 
     @Test

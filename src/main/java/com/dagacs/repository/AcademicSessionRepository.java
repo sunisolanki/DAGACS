@@ -17,4 +17,5 @@ public interface AcademicSessionRepository extends JpaRepository<AcademicSession
     boolean existsByName(String name);
     boolean existsByCode(String code);
     boolean existsByNameAndProgram(String name, Program program);
+    boolean existsByProgramId(Long programId);
 }

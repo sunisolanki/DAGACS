@@ -6,7 +6,9 @@ import com.dagacs.entity.Department;
 import com.dagacs.entity.Teacher;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.DepartmentRepository;
+import com.dagacs.repository.RoleRepository;
 import com.dagacs.repository.TeacherRepository;
+import com.dagacs.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +42,12 @@ class HodDesignationServiceTest {
 
     @Mock
     private EntityManager entityManager;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private RoleRepository roleRepository;
 
     @InjectMocks
     private HodDesignationService service;

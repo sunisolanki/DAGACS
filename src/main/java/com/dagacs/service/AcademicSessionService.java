@@ -116,6 +116,12 @@ public class AcademicSessionService {
             throw new AuthException("Academic session already exists for this program: " + name, 409);
         }
 
+        boolean programChanged = !session.getProgram().getId().equals(programId);
+        if (programChanged && batchRepository.existsByAcademicSessionId(session.getId())) {
+            throw new AuthException(
+                    "Cannot move academic session to a different program while batches/students exist", 409);
+        }
+
         session.setName(name);
         session.setCode(code);
         session.setProgram(program);

@@ -213,11 +213,42 @@ class SubjectOfferingServiceTest {
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject1));
         when(semesterRepository.findById(6L)).thenReturn(Optional.of(semester6));
         when(subjectOfferingRepository.existsBySubjectAndSemester(subject1, semester6)).thenReturn(false);
+        when(assignmentRepository.existsBySubjectOfferingId(1L)).thenReturn(false);
         when(subjectOfferingRepository.save(any(SubjectOffering.class))).thenAnswer(inv -> inv.getArgument(0));
 
         SubjectOfferingDTO result = subjectOfferingService.updateSubjectOffering(1L, request(1L, 6L));
         assertEquals(6L, result.getSemesterId());
         assertEquals(semester6, offering.getSemester());
+    }
+
+    @Test
+    void updateSubjectOffering_semesterChange_withTeacherAssignment_returns409_noMutation() {
+        SubjectOffering offering = buildOffering();
+        when(subjectOfferingRepository.findById(1L)).thenReturn(Optional.of(offering));
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject1));
+        when(semesterRepository.findById(6L)).thenReturn(Optional.of(semester6));
+        when(subjectOfferingRepository.existsBySubjectAndSemester(subject1, semester6)).thenReturn(false);
+        when(assignmentRepository.existsBySubjectOfferingId(1L)).thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> subjectOfferingService.updateSubjectOffering(1L, request(1L, 6L)));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot move subject offering to a different semester while teacher assignments exist",
+                ex.getMessage());
+        verify(subjectOfferingRepository, never()).save(any());
+    }
+
+    @Test
+    void updateSubjectOffering_unchangedSemester_skipsReassignmentGuard() {
+        SubjectOffering offering = buildOffering();
+        when(subjectOfferingRepository.findById(1L)).thenReturn(Optional.of(offering));
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject1));
+        when(semesterRepository.findById(5L)).thenReturn(Optional.of(semester5));
+        when(subjectOfferingRepository.save(any(SubjectOffering.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubjectOfferingDTO result = subjectOfferingService.updateSubjectOffering(1L, request(1L, 5L));
+        assertEquals(5L, result.getSemesterId());
+        verify(assignmentRepository, never()).existsBySubjectOfferingId(anyLong());
     }
 
     @Test

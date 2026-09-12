@@ -7,6 +7,7 @@ import com.dagacs.entity.Semester;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.SemesterRepository;
+import com.dagacs.repository.SubjectOfferingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,12 +21,15 @@ public class SemesterService {
 
     private final SemesterRepository semesterRepository;
     private final AcademicSessionRepository academicSessionRepository;
+    private final SubjectOfferingRepository subjectOfferingRepository;
 
     @Autowired
     public SemesterService(SemesterRepository semesterRepository,
-                           AcademicSessionRepository academicSessionRepository) {
+                           AcademicSessionRepository academicSessionRepository,
+                           SubjectOfferingRepository subjectOfferingRepository) {
         this.semesterRepository = semesterRepository;
         this.academicSessionRepository = academicSessionRepository;
+        this.subjectOfferingRepository = subjectOfferingRepository;
     }
 
     @Transactional
@@ -97,6 +101,12 @@ public class SemesterService {
             throw new AuthException("Semester already exists for this academic session: " + name, 409);
         }
 
+        boolean sessionChanged = !semester.getAcademicSession().getId().equals(academicSessionId);
+        if (sessionChanged && subjectOfferingRepository.existsBySemesterId(semester.getId())) {
+            throw new AuthException(
+                    "Cannot move semester to a different academic session while subject offerings exist", 409);
+        }
+
         semester.setName(name);
         semester.setCode(semesterDTO.getCode());
         semester.setYear(semesterDTO.getYear());
@@ -119,6 +129,9 @@ public class SemesterService {
     public void deleteSemester(Long id) {
         Semester semester = semesterRepository.findById(id)
                 .orElseThrow(() -> new AuthException("Semester not found with ID: " + id, 404));
+        if (subjectOfferingRepository.existsBySemesterId(id)) {
+            throw new AuthException("Cannot delete semester while subject offerings exist", 409);
+        }
         semesterRepository.delete(semester);
     }
 

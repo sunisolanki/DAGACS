@@ -100,6 +100,12 @@ public class SubjectOfferingService {
             throw new AuthException("Subject is already mapped to this semester", 409);
         }
 
+        boolean semesterChanged = !offering.getSemester().getId().equals(semester.getId());
+        if (semesterChanged && assignmentRepository.existsBySubjectOfferingId(id)) {
+            throw new AuthException(
+                    "Cannot move subject offering to a different semester while teacher assignments exist", 409);
+        }
+
         offering.setSubject(subject);
         offering.setSemester(semester);
         offering.setUpdatedAt(LocalDateTime.now());

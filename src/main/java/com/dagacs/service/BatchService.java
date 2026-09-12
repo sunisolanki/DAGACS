@@ -8,8 +8,11 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
+import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,14 +28,23 @@ public class BatchService {
     private final BatchRepository batchRepository;
     private final AcademicSessionRepository academicSessionRepository;
     private final SectionRepository sectionRepository;
+    private final StudentRepository studentRepository;
+    private final TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository;
+    private final AttendanceSessionRepository attendanceSessionRepository;
 
     @Autowired
     public BatchService(BatchRepository batchRepository,
                         AcademicSessionRepository academicSessionRepository,
-                        SectionRepository sectionRepository) {
+                        SectionRepository sectionRepository,
+                        StudentRepository studentRepository,
+                        TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository,
+                        AttendanceSessionRepository attendanceSessionRepository) {
         this.batchRepository = batchRepository;
         this.academicSessionRepository = academicSessionRepository;
         this.sectionRepository = sectionRepository;
+        this.studentRepository = studentRepository;
+        this.teacherSubjectSectionAssignmentRepository = teacherSubjectSectionAssignmentRepository;
+        this.attendanceSessionRepository = attendanceSessionRepository;
     }
 
     @Transactional
@@ -124,6 +136,26 @@ public class BatchService {
         if ((!batch.getName().equals(name) || !batch.getAcademicSession().getId().equals(academicSessionId))
                 && batchRepository.existsByAcademicSessionAndName(academicSession, name)) {
             throw new AuthException("Batch already exists for this academic session: " + name, 409);
+        }
+
+        boolean programChanged = !batch.getAcademicSession().getProgram().getId()
+                .equals(academicSession.getProgram().getId());
+        if (programChanged && studentRepository.countByBatchId(batch.getId()) > 0) {
+            throw new AuthException(
+                    "Cannot move batch to a different program while students are assigned", 409);
+        }
+
+        boolean sessionChanged = !batch.getAcademicSession().getId().equals(academicSession.getId());
+        if (sessionChanged) {
+            boolean hasAssignments = teacherSubjectSectionAssignmentRepository
+                    .existsBySectionBatchId(batch.getId());
+            boolean hasAttendanceSessions = attendanceSessionRepository
+                    .existsBySectionEntityBatchId(batch.getId());
+            if (hasAssignments || hasAttendanceSessions) {
+                throw new AuthException(
+                        "Cannot move batch to a different academic session while teacher assignments or attendance sessions exist",
+                        409);
+            }
         }
 
         batch.setBatchCode(batchCode);

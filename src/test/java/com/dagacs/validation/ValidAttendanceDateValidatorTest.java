@@ -59,6 +59,29 @@ class ValidAttendanceDateValidatorTest {
         assertFails("not-a-date");
     }
 
+    @Test
+    void calendar_valid_dates_pass() {
+        assertPasses("2024-02-29");
+        assertPasses("2025-02-28");
+        assertPasses("2024-04-30");
+        assertPasses("2024-12-31");
+        assertPasses("2024-01-31");
+        assertPasses("2024-06-30");
+        assertPasses("2024-09-30");
+        assertPasses("2024-11-30");
+    }
+
+    @Test
+    void impossible_calendar_dates_fail() {
+        assertFails("2024-02-30");
+        assertFails("2024-02-31");
+        assertFails("2023-02-29");
+        assertFails("2024-04-31");
+        assertFails("2024-06-31");
+        assertFails("2024-09-31");
+        assertFails("2024-11-31");
+    }
+
     private void assertPasses(String date) {
         DateHolder holder = new DateHolder(date);
         Set<ConstraintViolation<DateHolder>> violations = validator.validate(holder);

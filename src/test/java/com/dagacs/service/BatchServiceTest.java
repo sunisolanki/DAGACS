@@ -8,8 +8,11 @@ import com.dagacs.entity.Program;
 import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
+import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.StudentRepository;
+import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +40,15 @@ class BatchServiceTest {
 
     @Mock
     private SectionRepository sectionRepository;
+
+    @Mock
+    private StudentRepository studentRepository;
+
+    @Mock
+    private TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository;
+
+    @Mock
+    private AttendanceSessionRepository attendanceSessionRepository;
 
     @InjectMocks
     private BatchService batchService;
@@ -122,6 +134,8 @@ class BatchServiceTest {
         when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
         when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(nextSession));
         when(batchRepository.existsByAcademicSessionAndName(nextSession, "2026 Batch")).thenReturn(false);
+        when(teacherSubjectSectionAssignmentRepository.existsBySectionBatchId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityBatchId(1L)).thenReturn(false);
         when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
 
         BatchDTO result = batchService.updateBatch(1L, dto);
@@ -131,6 +145,126 @@ class BatchServiceTest {
         verify(batchRepository).save(captor.capture());
         assertEquals(nextSession, captor.getValue().getAcademicSession());
         assertEquals("M.Tech CSE", captor.getValue().getProgram());
+    }
+
+    @Test
+    void updateBatch_sameProgramSessionChange_withTeacherAssignment_returns409_noMutation() {
+        AcademicSession nextSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28").program(program).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(nextSession));
+        when(batchRepository.existsByAcademicSessionAndName(nextSession, "2026 Batch")).thenReturn(false);
+        when(teacherSubjectSectionAssignmentRepository.existsBySectionBatchId(1L)).thenReturn(true);
+        when(attendanceSessionRepository.existsBySectionEntityBatchId(1L)).thenReturn(false);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> batchService.updateBatch(1L, dto));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot move batch to a different academic session while teacher assignments or attendance sessions exist",
+                ex.getMessage());
+        verify(batchRepository, never()).save(any());
+    }
+
+    @Test
+    void updateBatch_sameProgramSessionChange_withAttendanceSession_returns409_noMutation() {
+        AcademicSession nextSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28").program(program).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(nextSession));
+        when(batchRepository.existsByAcademicSessionAndName(nextSession, "2026 Batch")).thenReturn(false);
+        when(teacherSubjectSectionAssignmentRepository.existsBySectionBatchId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityBatchId(1L)).thenReturn(true);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> batchService.updateBatch(1L, dto));
+        assertEquals(409, ex.getStatus());
+        assertEquals("Cannot move batch to a different academic session while teacher assignments or attendance sessions exist",
+                ex.getMessage());
+        verify(batchRepository, never()).save(any());
+    }
+
+    @Test
+    void updateBatch_unchangedSession_skipsReassignmentGuard() {
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setName("Renamed");
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(academicSession));
+        when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BatchDTO result = batchService.updateBatch(1L, dto);
+        assertEquals(1L, result.getAcademicSessionId());
+        assertEquals("Renamed", result.getName());
+        verify(teacherSubjectSectionAssignmentRepository, never()).existsBySectionBatchId(anyLong());
+        verify(attendanceSessionRepository, never()).existsBySectionEntityBatchId(anyLong());
+    }
+
+    @Test
+    void updateBatch_toDifferentProgram_withStudents_returns409_noMutation() {
+        Program otherProgram = Program.builder().id(2L).name("B.Tech CSE").code("BTCSE").build();
+        AcademicSession otherSession = AcademicSession.builder()
+                .id(2L).name("2026-27").code("2026-27").program(otherProgram).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(otherSession));
+        when(studentRepository.countByBatchId(1L)).thenReturn(1L);
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> batchService.updateBatch(1L, dto));
+        assertEquals(409, ex.getStatus());
+        verify(batchRepository, never()).save(any());
+    }
+
+    @Test
+    void updateBatch_toDifferentProgram_withoutStudents_allows() {
+        Program otherProgram = Program.builder().id(2L).name("B.Tech CSE").code("BTCSE").build();
+        AcademicSession otherSession = AcademicSession.builder()
+                .id(2L).name("2026-27").code("2026-27").program(otherProgram).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(otherSession));
+        when(studentRepository.countByBatchId(1L)).thenReturn(0L);
+        when(batchRepository.existsByAcademicSessionAndName(otherSession, "2026 Batch")).thenReturn(false);
+        when(teacherSubjectSectionAssignmentRepository.existsBySectionBatchId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityBatchId(1L)).thenReturn(false);
+        when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BatchDTO result = batchService.updateBatch(1L, dto);
+        assertEquals(2L, result.getAcademicSessionId());
+        assertEquals("B.Tech CSE", result.getProgram());
+        ArgumentCaptor<Batch> captor = ArgumentCaptor.forClass(Batch.class);
+        verify(batchRepository).save(captor.capture());
+        assertEquals(otherSession, captor.getValue().getAcademicSession());
+    }
+
+    @Test
+    void updateBatch_sameProgram_withStudents_allowsSessionMove() {
+        AcademicSession nextSession = AcademicSession.builder()
+                .id(2L).name("2026-27").code("2026-27").program(program).build();
+        Batch batch = buildBatch();
+        BatchDTO dto = validBatchDTO();
+        dto.setAcademicSessionId(2L);
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(academicSessionRepository.findById(2L)).thenReturn(Optional.of(nextSession));
+        when(batchRepository.existsByAcademicSessionAndName(nextSession, "2026 Batch")).thenReturn(false);
+        when(teacherSubjectSectionAssignmentRepository.existsBySectionBatchId(1L)).thenReturn(false);
+        when(attendanceSessionRepository.existsBySectionEntityBatchId(1L)).thenReturn(false);
+        when(batchRepository.save(any(Batch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BatchDTO result = batchService.updateBatch(1L, dto);
+        assertEquals(2L, result.getAcademicSessionId());
+        assertEquals("M.Tech CSE", result.getProgram());
+        verify(studentRepository, never()).countByBatchId(anyLong());
     }
 
     @Test

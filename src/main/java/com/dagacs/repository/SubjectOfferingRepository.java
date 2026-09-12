@@ -11,5 +11,6 @@ import java.util.List;
 @Repository
 public interface SubjectOfferingRepository extends JpaRepository<SubjectOffering, Long> {
     boolean existsBySubjectAndSemester(Subject subject, Semester semester);
+    boolean existsBySemesterId(Long semesterId);
     List<SubjectOffering> findAllByOrderByIdAsc();
 }
