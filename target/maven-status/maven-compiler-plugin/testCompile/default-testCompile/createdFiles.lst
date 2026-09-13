@@ -63,6 +63,7 @@ com\dagacs\service\DepartmentServiceTest.class
 com\dagacs\controller\SubjectControllerTest.class
 com\dagacs\security\AttendanceDataIntegrityIntegrationTest$Slice.class
 com\dagacs\security\LoginRateLimitEmailIntegrationTest.class
+com\dagacs\service\AccountProvisioningServiceTest.class
 com\dagacs\security\AssignmentConsistencyReassignmentIntegrationTest.class
 com\dagacs\controller\AdminTeacherManagementControllerTest.class
 com\dagacs\dto\StudentManagementRequestDTOValidationTest.class

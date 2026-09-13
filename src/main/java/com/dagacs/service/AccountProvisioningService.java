@@ -136,18 +136,23 @@ public class AccountProvisioningService {
 
     /**
      * Encodes and persists a new password for an existing login (admin reset,
-     * M10A). The reset forces the {@code mustChangePassword} flag back on so the
-     * student must change the password at the next login, and the existing login
-     * account is reused - no second {@link User} is ever created. The encoded
-     * hash is written to {@code users.password}; the raw password is never
-     * retained.
+     * M10A). The reset forces the {@code mustChangePassword} flag back on only
+     * for STUDENT logins, so students must change the password at the next
+     * login. TEACHER/HOD/ADMIN resets leave the flag untouched: those roles must
+     * never be routed into the STUDENT-only change-password flow, so the reset
+     * must not create a stale flag that could trap the account. The existing
+     * login account is reused - no second {@link User} is ever created. The
+     * encoded hash is written to {@code users.password}; the raw password is
+     * never retained.
      */
     public void resetPassword(User user, String rawPassword) {
         if (rawPassword == null || rawPassword.trim().length() < 8) {
             throw new AuthException("Password must be at least 8 characters", 400);
         }
         user.setPassword(passwordEncoder.encode(rawPassword.trim()));
-        user.setMustChangePassword(true);
+        if ("STUDENT".equals(user.getRole().getName())) {
+            user.setMustChangePassword(true);
+        }
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
     }

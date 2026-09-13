@@ -339,4 +339,19 @@ class StudentPasswordChangeIntegrationTest {
         LoginResult relogin = login(student.rollNumber, student.temporaryPassword);
         org.junit.jupiter.api.Assertions.assertTrue(relogin.mustChangePassword);
     }
+
+    @Test
+    void nonStudentRole_attemptingStudentChangePassword_gets403() throws Exception {
+        // a real HOD JWT (seeded account) must never be allowed into the
+        // STUDENT-only change-password endpoint (M10A authorization contract)
+        LoginResult hod = login("hod@dagacs.local", "Hod@123");
+
+        mockMvc.perform(put("/api/student/change-password")
+                        .header("Authorization", "Bearer " + hod.token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Hod@123\","
+                                + "\"newPassword\":\"" + NEW_PASSWORD + "\","
+                                + "\"confirmPassword\":\"" + NEW_PASSWORD + "\"}"))
+                .andExpect(status().isForbidden());
+    }
 }

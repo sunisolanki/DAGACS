@@ -326,9 +326,72 @@ class TeacherProvisioningAcceptanceIntegrationTest {
                         .content("{\"email\":\"" + email + "\",\"password\":\"TempPass#1\"}"))
                 .andExpect(status().isUnauthorized());
 
-        String newToken = loginToken(email, "NewPass#456");
+        // M10A login-flow correction: a TEACHER reset must NOT force the Student
+        // password-change flow, so the flag stays false on the next login.
+        MvcResult login = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"NewPass#456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(false))
+                .andReturn();
+        String newToken = objectMapper.readTree(login.getResponse().getContentAsString()).get("token").asText();
         mockMvc.perform(get("/api/teacher/assignments")
                         .header("Authorization", "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void resettingHodLoginPassword_newPasswordWorks_flagStaysFalse_hodApiReachable() throws Exception {
+        String email = freshEmail("hod-reset-");
+        String token = adminToken();
+        Department department = createDepartment();
+
+        MvcResult created = mockMvc.perform(post("/api/admin/teacher-management/teachers")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"email\":\"" + email + "\","
+                                + "\"fullName\":\"Prof HOD\","
+                                + "\"phone\":\"1234567890\","
+                                + "\"designation\":\"Professor\","
+                                + "\"password\":\"TempPass#1\","
+                                + "\"departmentId\":" + department.getId()
+                                + "}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(patch("/api/admin/teachers/" + id + "/hod")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"designated\":true,\"departmentId\":" + department.getId() + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hod").value(true));
+
+        mockMvc.perform(put("/api/admin/teacher-management/teachers/" + id + "/login/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"NewHodPass#456\"}"))
+                .andExpect(status().isOk());
+
+        // old password stops working; the new password works on the next login
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"TempPass#1\"}"))
+                .andExpect(status().isUnauthorized());
+
+        // M10A login-flow correction: a HOD reset must NOT force the Student
+        // password-change flow, and the HOD stays able to reach HOD APIs.
+        MvcResult login = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"identifier\":\"" + email + "\",\"password\":\"NewHodPass#456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(false))
+                .andReturn();
+        String hodToken = objectMapper.readTree(login.getResponse().getContentAsString()).get("token").asText();
+
+        mockMvc.perform(get("/api/hod/me")
+                        .header("Authorization", "Bearer " + hodToken))
                 .andExpect(status().isOk());
     }
 

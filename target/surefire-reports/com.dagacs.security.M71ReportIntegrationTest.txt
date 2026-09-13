@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.security.M71ReportIntegrationTest
 -------------------------------------------------------------------------------
-Tests run: 36, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.68 s -- in com.dagacs.security.M71ReportIntegrationTest
+Tests run: 36, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.705 s -- in com.dagacs.security.M71ReportIntegrationTest

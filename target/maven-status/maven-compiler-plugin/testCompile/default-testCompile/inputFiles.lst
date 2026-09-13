@@ -1,5 +1,6 @@
 D:\DAGACS\backend\src\test\java\com\dagacs\security\RoleEchoEndpointTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\StudentManagementSecurityIntegrationTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\service\AccountProvisioningServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\StudentAttendanceServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\AcademicSessionControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\dto\AttendanceAuditLogDTOTest.java

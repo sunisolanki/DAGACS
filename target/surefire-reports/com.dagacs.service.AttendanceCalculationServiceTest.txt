@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.service.AttendanceCalculationServiceTest
 -------------------------------------------------------------------------------
-Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.598 s -- in com.dagacs.service.AttendanceCalculationServiceTest
+Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.306 s -- in com.dagacs.service.AttendanceCalculationServiceTest
