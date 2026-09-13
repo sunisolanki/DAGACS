@@ -1,42 +1,32 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.StudentImportResult;
+import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
 import com.dagacs.exception.AuthException;
 import com.dagacs.studentimport.StudentImportParser;
 import com.dagacs.studentimport.StudentImportParser.StudentImportRow;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
-/**
- * M9.10 Student bulk Excel/CSV import (all-or-nothing).
- * <p>
- * Implements the locked M9.10 contract:
- * <ul>
- *   <li>PROFILE records only - no {@code User} rows, no passwords, no
- *       {@link AccountProvisioningService} involvement.</li>
- *   <li>Every row is mapped to the same {@link StudentManagementRequestDTO} and
- *       validated through the exact same path as single-student creation
- *       ({@link StudentManagementService#assertValidForCreate}), so the M9.9
- *       Program &rarr; Batch &rarr; Section consistency guards are inherited, never
- *       duplicated or bypassed.</li>
- *   <li>All-or-nothing: a file-level problem or any rejected row means nothing is
- *       persisted; every rejected row is reported with its physical file row
- *       number, field and message.</li>
- *   <li>Duplicate detection by roll number (and by email, case-insensitively,
- *       matching the login-linkage semantics) both inside the file and against
- *       the database.</li>
- * </ul>
- */
 @Service
 public class StudentImportService {
 
@@ -44,22 +34,15 @@ public class StudentImportService {
     private final StudentManagementService studentManagementService;
     private final Validator validator;
 
+    @Autowired
     public StudentImportService(StudentImportParser parser,
-                                StudentManagementService studentManagementService,
-                                Validator validator) {
+                                 StudentManagementService studentManagementService,
+                                 Validator validator) {
         this.parser = parser;
         this.studentManagementService = studentManagementService;
         this.validator = validator;
     }
 
-    /**
-     * Parses, validates and (only when every row is valid) persists the uploaded
-     * students within a single transaction. Returns a summary with the exact
-     * SOW shape: {@code totalRows}/{@code importedRows}/{@code rejectedRows} and
-     * row-wise errors ({@code rowNumber}, {@code field}, {@code message}).
-     * On any failure {@code importedRows} is {@code 0} - nothing is partially
-     * applied.
-     */
     @Transactional
     public StudentImportResult importStudents(String filename, byte[] bytes) {
         List<StudentImportRow> rows = parser.parse(filename, bytes);
@@ -122,10 +105,12 @@ public class StudentImportService {
 
         int totalRows = rows.size();
         int importedRows = 0;
+        Map<String, String> importTempPasswords = new HashMap<>();
         if (errors.isEmpty()) {
             for (StudentManagementRequestDTO dto : validRows) {
-                studentManagementService.createStudent(dto);
+                StudentManagementDTO created = studentManagementService.createStudent(dto);
                 importedRows++;
+                collectTemporaryPassword(created, importTempPasswords);
             }
         }
 
@@ -134,21 +119,96 @@ public class StudentImportService {
                 ? "Imported " + importedRows + " of " + totalRows + " students."
                 : "Import failed: " + errors.size() + " row(s) rejected. "
                         + "No students were imported.";
+
+        String credentialDownloadId = null;
+        if (errors.isEmpty() && !importTempPasswords.isEmpty()) {
+            credentialDownloadId = generateCredentialArtifact(validRows, importTempPasswords);
+        }
+
         return StudentImportResult.builder()
                 .totalRows(totalRows)
                 .importedRows(importedRows)
                 .rejectedRows(errors.size())
                 .message(message)
                 .errors(errors)
+                .credentialDownloadId(credentialDownloadId)
                 .build();
     }
 
     /**
-     * Maps a raw row into the frozen create DTO. Only conversion-level problems
-     * (unparseable numeric IDs / age) are recorded here; required-field and
-     * format checks fall through to the DTO's Bean Validation (the same
-     * annotations the single-create path trusts).
+     * Collects the actual temporary password generated by the canonical
+     * {@link StudentManagementService#createStudent} provisioning path - the
+     * XLSX artifact must contain exactly the password that was persisted, never
+     * a separately generated one.
      */
+    private void collectTemporaryPassword(StudentManagementDTO created,
+                                           Map<String, String> tempPasswords) {
+        String rollNumber = created.getRollNumber();
+        String tempPassword = created.getTemporaryPassword();
+        if (rollNumber != null && tempPassword != null) {
+            tempPasswords.put(rollNumber, tempPassword);
+        }
+    }
+
+    private String generateCredentialArtifact(List<StudentManagementRequestDTO> validRows,
+                                               Map<String, String> tempPasswords) {
+        String downloadId = UUID.randomUUID().toString();
+        try {
+            byte[] xlsxBytes = buildXlsx(validRows, tempPasswords);
+            CredentialArtifact artifact = new CredentialArtifact(downloadId, xlsxBytes);
+            CredentialArtifactStore.put(downloadId, artifact);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    CredentialArtifactStore.put(downloadId, artifact);
+                }
+            });
+        } catch (Exception e) {
+            // Artifact generation failed - import still succeeds
+        }
+        return downloadId;
+    }
+
+    private byte[] buildXlsx(List<StudentManagementRequestDTO> rows,
+                              Map<String, String> tempPasswords) throws IOException {
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Credential Downloads");
+
+        Row headerRow = sheet.createRow(0);
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        String[] headers = {"Roll Number", "Email", "Temporary Password"};
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        for (int i = 0; i < rows.size(); i++) {
+            StudentManagementRequestDTO dto = rows.get(i);
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(dto.getRollNumber() != null ? dto.getRollNumber() : "");
+            row.createCell(1).setCellValue(dto.getEmail() != null ? dto.getEmail() : "");
+            String tempPass = tempPasswords.get(dto.getRollNumber());
+            if (tempPass == null) {
+                tempPass = "";
+            }
+            row.createCell(2).setCellValue(tempPass);
+        }
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        workbook.close();
+        return outputStream.toByteArray();
+    }
+
     private StudentManagementRequestDTO buildDto(Map<String, String> row,
                                                   List<StudentImportResult.RowError> errors,
                                                   int rowNumber) {
@@ -213,11 +273,6 @@ public class StudentImportService {
                 e.getRowNumber() == rowNumber && e.getField().equals(field));
     }
 
-    /**
-     * Best-effort field attribution for errors raised by the shared validation
-     * path (which reports a message rather than a field). Falls back to the
-     * generic {@code row} identifier.
-     */
     private String fieldForMessage(String message) {
         if (message == null) {
             return "row";

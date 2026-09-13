@@ -300,6 +300,53 @@ class StudentManagementServiceTest {
     }
 
     @Test
+    void createStudent_autoProvisionsStudentLogin_withTemporaryPassword() {
+        stubValidReferences();
+        stubTeacherNoCollision();
+        when(accountProvisioningService.generateSecurePassword()).thenReturn("TempPass#2026");
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+        User provisioned = User.builder()
+                .id(7L)
+                .email("student1@dagacs.local")
+                .password("encoded")
+                .fullName("Rahul Kumar")
+                .phone("")
+                .status("ACTIVE")
+                .avatarUrl("")
+                .mustChangePassword(true)
+                .role(Role.builder().id(1L).name("STUDENT").build())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        when(userRepository.findByEmail("student1@dagacs.local"))
+                .thenReturn(Optional.of(provisioned));
+
+        StudentManagementDTO result = service.createStudent(validRequest());
+
+        assertEquals("TempPass#2026", result.getTemporaryPassword());
+        assertTrue(result.isLoginLinked());
+        assertTrue(result.isMustChangePassword());
+        assertEquals("ACTIVE", result.getLoginStatus());
+        verify(accountProvisioningService).generateSecurePassword();
+        verify(accountProvisioningService).provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "TempPass#2026");
+        verify(studentRepository).save(any(Student.class));
+    }
+
+    @Test
+    void createStudent_noEmail_doesNotProvisionLogin() {
+        stubValidReferences();
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StudentManagementDTO result = service.createStudent(minimalRequest());
+
+        assertEquals(null, result.getTemporaryPassword());
+        verify(accountProvisioningService, never())
+                .provisionTemporaryLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never()).generateSecurePassword();
+    }
+
+    @Test
     void getAllStudents_returnsListInNameOrder() {
         Student s = existingStudent();
         when(studentRepository.findAllByOrderByNameAsc()).thenReturn(List.of(s));

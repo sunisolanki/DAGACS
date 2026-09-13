@@ -10,7 +10,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 
 /**
  * Login-account provisioning service (M9.5.1 / M9.5.2).
@@ -86,15 +88,80 @@ public class AccountProvisioningService {
     }
 
     /**
-     * Encodes and persists a new password for an existing login (reset password).
-     * The encoded hash is written to {@code users.password}; the raw password is
-     * never retained.
+     * Generates a secure temporary password using java.security.SecureRandom.
+     * Returns a Base64-encoded 18-character string suitable for one-time use.
+     */
+    public String generateSecurePassword() {
+        SecureRandom random = new SecureRandom();
+        byte[] bytes = new byte[18];
+        random.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /**
+     * Creates a login account with the given temporary password.
+     * The {@code mustChangePassword} flag is set to {@code true} on the
+     * newly created User so the first login triggers a forced password change.
+     * Rejects collisions (409), blank/weak passwords (400) and missing roles (500).
+     */
+    @Transactional
+    public User provisionTemporaryLogin(String email, String fullName, String roleName,
+                                        String status, String rawPassword) {
+        String normalizedEmail = normalizeRequired(email, "Email is required");
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new AuthException("An account already exists for email: " + email, 409);
+        }
+        if (rawPassword == null || rawPassword.trim().length() < 8) {
+            throw new AuthException("Password must be at least 8 characters", 400);
+        }
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new AuthException("Required role is not configured: " + roleName, 500));
+        String normalizedStatus = normalizeStatus(status);
+        String fullNameValue = defaultValue(fullName);
+
+        LocalDateTime now = LocalDateTime.now();
+        return userRepository.save(User.builder()
+                .email(normalizedEmail)
+                .password(passwordEncoder.encode(rawPassword.trim()))
+                .fullName(fullNameValue)
+                .phone("")
+                .status(normalizedStatus)
+                .role(role)
+                .avatarUrl("")
+                .mustChangePassword(true)
+                .createdAt(now)
+                .updatedAt(now)
+                .build());
+    }
+
+    /**
+     * Encodes and persists a new password for an existing login (admin reset,
+     * M10A). The reset forces the {@code mustChangePassword} flag back on so the
+     * student must change the password at the next login, and the existing login
+     * account is reused - no second {@link User} is ever created. The encoded
+     * hash is written to {@code users.password}; the raw password is never
+     * retained.
      */
     public void resetPassword(User user, String rawPassword) {
         if (rawPassword == null || rawPassword.trim().length() < 8) {
             throw new AuthException("Password must be at least 8 characters", 400);
         }
         user.setPassword(passwordEncoder.encode(rawPassword.trim()));
+        user.setMustChangePassword(true);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+    }
+
+    /**
+     * Encodes and persists a new password and resets the mustChangePassword flag.
+     * Used when a student completes their forced first-login password change.
+     */
+    public void setNewPassword(User user, String rawPassword) {
+        if (rawPassword == null || rawPassword.trim().length() < 8) {
+            throw new AuthException("Password must be at least 8 characters", 400);
+        }
+        user.setPassword(passwordEncoder.encode(rawPassword.trim()));
+        user.setMustChangePassword(false);
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
     }

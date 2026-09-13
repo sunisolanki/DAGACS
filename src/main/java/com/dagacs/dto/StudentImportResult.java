@@ -54,4 +54,6 @@ public class StudentImportResult {
         private String message;
         private int status;
     }
+
+    private String credentialDownloadId;
 }

@@ -32,6 +32,7 @@ com\dagacs\entity\AcademicSession.class
 com\dagacs\dto\TeacherLoginRequestDTO.class
 com\dagacs\dto\StudentManagementRequestDTO$StudentManagementRequestDTOBuilder.class
 com\dagacs\entity\AttendanceAuditLog$AttendanceAuditLogBuilder.class
+com\dagacs\controller\StudentPasswordChangeController.class
 com\dagacs\dto\AttendanceSessionDTO.class
 com\dagacs\entity\Semester$SemesterBuilder.class
 com\dagacs\config\AuditLogReasonSchemaMigration.class
@@ -217,9 +218,11 @@ com\dagacs\service\TeacherAssignmentService.class
 com\dagacs\security\AuthenticatedStudentResolver.class
 com\dagacs\security\LoginRateLimitFilter$ReplayableServletInputStream.class
 com\dagacs\repository\AttendanceRecordRepository.class
+com\dagacs\service\CredentialArtifact.class
 com\dagacs\dto\SubjectOfferingRequestDTO.class
 com\dagacs\repository\SubjectRepository.class
 com\dagacs\service\HodReportService.class
+com\dagacs\service\CredentialArtifactStore.class
 com\dagacs\dto\HodIdentityDTO$HodIdentityDTOBuilder.class
 com\dagacs\entity\AttendanceRecord.class
 com\dagacs\entity\TeacherSubjectSectionAssignment.class
@@ -239,13 +242,16 @@ com\dagacs\service\StudentProfileService.class
 com\dagacs\config\SectionSubjectSchemaMigration.class
 com\dagacs\service\HodAnalyticsService.class
 com\dagacs\controller\AdminController.class
+com\dagacs\dto\StudentChangePasswordRequestDTO.class
 com\dagacs\service\AttendanceSessionService.class
 com\dagacs\repository\TeacherReportRepository.class
 com\dagacs\service\StudentAttendanceService.class
 com\dagacs\dto\HodDesignationRequestDTO.class
+com\dagacs\service\StudentPasswordChangeService.class
 com\dagacs\entity\AttendanceSession.class
 com\dagacs\repository\StudentRepository.class
 com\dagacs\repository\AcademicSessionRepository.class
+com\dagacs\service\StudentImportService$1.class
 com\dagacs\dto\HodCoverageReportDTO$HodCoverageReportDTOBuilder.class
 com\dagacs\dto\HodSectionAttendanceDTO$HodSectionAttendanceDTOBuilder.class
 com\dagacs\security\CustomUserDetailsService.class

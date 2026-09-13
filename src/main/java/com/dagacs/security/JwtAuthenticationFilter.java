@@ -27,6 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userRepository = userRepository;
     }
 
+    private static final String CHANGE_PASSWORD_PATH = "/api/student/change-password";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -38,13 +40,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
+        String requestUri = request.getRequestURI();
 
         if (jwtTokenProvider.validateToken(token)) {
             String email = jwtTokenProvider.getSubject(token);
-            userRepository.findByEmail(email).ifPresent(user -> {
-                if (!"ACTIVE".equals(user.getStatus())) {
-                    return;
-                }
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user != null && !"ACTIVE".equals(user.getStatus())) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Account is disabled");
+                return;
+            }
+            if (user != null && user.isMustChangePassword()
+                    && "STUDENT".equals(user.getRole().getName())
+                    && !CHANGE_PASSWORD_PATH.equals(requestUri)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "STUDENT_PASSWORD_CHANGE_REQUIRED");
+                return;
+            }
+            if (user != null) {
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 user.getEmail(),
@@ -52,7 +63,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 authoritiesOf(user));
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            });
+            }
         }
 
         filterChain.doFilter(request, response);

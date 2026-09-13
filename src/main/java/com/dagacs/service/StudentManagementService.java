@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -87,7 +90,19 @@ public class StudentManagementService {
         student.setCreatedAt(now);
         student.setUpdatedAt(now);
         student = studentRepository.save(student);
-        return convertToDTO(student);
+
+        String temporaryPassword = null;
+        String email = student.getEmail();
+        if (email != null && !email.isBlank()) {
+            temporaryPassword = accountProvisioningService.generateSecurePassword();
+            accountProvisioningService.provisionTemporaryLogin(
+                    email.toLowerCase(), student.getName(), ROLE_STUDENT,
+                    student.getStatus(), temporaryPassword);
+        }
+
+        StudentManagementDTO dto = convertToDTO(student);
+        dto.setTemporaryPassword(temporaryPassword);
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -152,10 +167,7 @@ public class StudentManagementService {
 
         Optional<User> existing = userRepository.findByEmail(email.toLowerCase());
         if (existing.isPresent()) {
-            if (ROLE_STUDENT.equals(existing.get().getRole().getName())) {
-                throw new AuthException("A login account is already linked to this student", 409);
-            }
-            throw new AuthException("Email is already in use by another login account", 409);
+            throw new AuthException("Email is already in use by a login account", 409);
         }
 
         accountProvisioningService.provisionLogin(email, student.getName(),
@@ -386,6 +398,7 @@ public class StudentManagementService {
                 .sectionName(student.getSection().getName())
                 .loginLinked(user != null)
                 .loginStatus(user != null ? user.getStatus() : null)
+                .mustChangePassword(user != null && user.isMustChangePassword())
                 .createdAt(student.getCreatedAt())
                 .updatedAt(student.getUpdatedAt())
                 .build();

@@ -42,4 +42,7 @@ public class User {
 
     @Column(nullable = false)
     private String avatarUrl;
+
+    @Column(nullable = false)
+    private boolean mustChangePassword = false;
 }

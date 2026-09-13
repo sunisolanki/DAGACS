@@ -39,7 +39,11 @@ public class StudentManagementDTO {
 
     private boolean loginLinked;
     private String loginStatus;
+    private boolean mustChangePassword;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private String temporaryPassword;
+    private String credentialDownloadId;
 }

@@ -22,6 +22,7 @@ com\dagacs\security\TeacherAttendanceOwnershipIntegrationTest.class
 com\dagacs\service\ProgramServiceTest.class
 com\dagacs\service\SemesterServiceTest.class
 com\dagacs\dto\AttendanceAuditLogDTOTest.class
+com\dagacs\security\StudentPasswordChangeIntegrationTest.class
 com\dagacs\security\TeacherAttendanceOwnershipIntegrationTest$Slice.class
 com\dagacs\controller\AdminTeacherAssignmentControllerTest.class
 com\dagacs\security\HodRoleParityIntegrationTest.class
@@ -44,6 +45,7 @@ com\dagacs\security\HodIdentityIntegrationTest.class
 com\dagacs\security\CorsTest.class
 com\dagacs\controller\SubjectOfferingControllerTest.class
 com\dagacs\dto\TeacherAssignmentDTOValidationTest.class
+com\dagacs\security\StudentPasswordChangeIntegrationTest$ProvisionedStudent.class
 com\dagacs\service\BatchServiceTest.class
 com\dagacs\validation\ValidAttendanceDateValidatorTest$DateHolder.class
 com\dagacs\config\AcademicSessionLegacySchemaMigrationTest.class
@@ -77,6 +79,7 @@ com\dagacs\exception\ExceptionHandlerTest.class
 com\dagacs\controller\ProgramControllerTest.class
 com\dagacs\service\SubjectServiceTest.class
 com\dagacs\repository\AttendanceRecordRepositoryTest.class
+com\dagacs\security\StudentPasswordChangeIntegrationTest$LoginResult.class
 com\dagacs\security\StudentProfileIntegrationTest.class
 com\dagacs\dto\AttendanceSessionCreateRequestDTOTest.class
 com\dagacs\security\M72ExportIntegrationTest$1.class

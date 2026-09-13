@@ -5,12 +5,14 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Section;
+import com.dagacs.entity.User;
 import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.StudentManagementRepository;
+import com.dagacs.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.ss.usermodel.Row;
@@ -22,17 +24,20 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -83,6 +88,12 @@ class StudentImportIntegrationTest {
 
     @Autowired
     private StudentManagementRepository studentManagementRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private String login(String email, String rawPassword) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
@@ -198,6 +209,73 @@ class StudentImportIntegrationTest {
 
         assertTrue(studentManagementRepository.existsByRollNumber("IMPR1"));
         assertTrue(studentManagementRepository.existsByRollNumber("IMPR2"));
+    }
+
+    @Test
+    void bulkImport_artifactPasswordsMatchPersistedAccounts() throws Exception {
+        String admin = adminToken();
+        Section section = oneSectionFixture();
+        long program = section.getBatch().getAcademicSession().getProgram().getId();
+        long batch = section.getBatch().getId();
+        long sectionId = section.getId();
+
+        byte[] xlsx = xlsx(
+                new String[]{"MATCH1", "match1@dagacs.local", "Mia Kapoor", "F", "", "",
+                        "", "ENR-M1", "20", "2026-01-01", "ACTIVE",
+                        String.valueOf(program), String.valueOf(batch), String.valueOf(sectionId)},
+                new String[]{"MATCH2", "match2@dagacs.local", "Arjun Rao", "M", "", "",
+                        "", "ENR-M2", "21", "2026-01-01", "ACTIVE",
+                        String.valueOf(program), String.valueOf(batch), String.valueOf(sectionId)});
+
+        MvcResult importResult = mockMvc.perform(multipart("/api/admin/students/import")
+                        .file(new MockMultipartFile("file", "students.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                xlsx))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.importedRows").value(2))
+                .andExpect(jsonPath("$.credentialDownloadId").isNotEmpty())
+                .andReturn();
+
+        String downloadId = objectMapper
+                .readTree(importResult.getResponse().getContentAsString())
+                .get("credentialDownloadId").asText();
+
+        // one STUDENT account per imported row, each forcing a password change
+        assertTrue(userRepository.existsByEmail("match1@dagacs.local"));
+        assertTrue(userRepository.existsByEmail("match2@dagacs.local"));
+        User user1 = userRepository.findByEmail("match1@dagacs.local").orElseThrow();
+        User user2 = userRepository.findByEmail("match2@dagacs.local").orElseThrow();
+        assertTrue(user1.isMustChangePassword());
+        assertTrue(user2.isMustChangePassword());
+
+        // the downloadable XLSX must contain exactly the passwords that were
+        // persisted as BCrypt hashes
+        MvcResult download = mockMvc.perform(get("/api/admin/students/import/credentials/" + downloadId)
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andReturn();
+        byte[] artifact = download.getResponse().getContentAsByteArray();
+
+        java.util.Map<String, String> passwords = new java.util.LinkedHashMap<>();
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(artifact))) {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) {
+                    continue;
+                }
+                passwords.put(row.getCell(0).getStringCellValue(),
+                        row.getCell(2).getStringCellValue());
+            }
+        }
+
+        assertEquals(2, passwords.size());
+        assertTrue(passwordEncoder.matches(passwords.get("MATCH1"), user1.getPassword()));
+        assertTrue(passwordEncoder.matches(passwords.get("MATCH2"), user2.getPassword()));
+
+        // and each artifact password actually authenticates
+        login("match1@dagacs.local", passwords.get("MATCH1"));
+        login("match2@dagacs.local", passwords.get("MATCH2"));
     }
 
     @Test

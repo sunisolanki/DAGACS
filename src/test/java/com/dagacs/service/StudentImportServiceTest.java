@@ -1,17 +1,25 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.StudentImportResult;
+import com.dagacs.dto.StudentManagementDTO;
+import com.dagacs.dto.StudentManagementRequestDTO;
 import com.dagacs.exception.AuthException;
+import com.dagacs.service.CredentialArtifact;
+import com.dagacs.service.CredentialArtifactStore;
 import com.dagacs.studentimport.StudentImportParser;
 import com.dagacs.studentimport.StudentImportParser.StudentImportRow;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayInputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,12 +73,19 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void allValidRows_areImportedWithFullSummary() {
+    void allValidRows_areImportedWithFullSummary() throws Exception {
         when(parser.parse("students.xlsx", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
                         new StudentImportRow(3, row("R2", "b@dagacs.local", "Bob"))));
-        when(studentManagementService.createStudent(any()))
-                .thenReturn(null);
+        when(studentManagementService.createStudent(any())).thenAnswer(inv -> {
+            StudentManagementRequestDTO dto = inv.getArgument(0);
+            return StudentManagementDTO.builder()
+                    .rollNumber(dto.getRollNumber())
+                    .email(dto.getEmail())
+                    .name(dto.getName())
+                    .temporaryPassword("TempPass_" + dto.getRollNumber())
+                    .build();
+        });
 
         StudentImportResult result = service.importStudents("students.xlsx", new byte[]{1});
 
@@ -78,8 +93,35 @@ class StudentImportServiceTest {
         assertEquals(2, result.getImportedRows());
         assertEquals(0, result.getRejectedRows());
         assertTrue(result.getErrors().isEmpty());
+        assertTrue(result.getCredentialDownloadId() != null
+                && !result.getCredentialDownloadId().isEmpty());
         verify(studentManagementService, times(2)).createStudent(any());
         verify(studentManagementService, times(2)).assertValidForCreate(any());
+
+        Map<String, String> artifactPasswords = parsePasswordColumn(
+                result.getCredentialDownloadId());
+        assertEquals("TempPass_R1", artifactPasswords.get("R1"));
+        assertEquals("TempPass_R2", artifactPasswords.get("R2"));
+    }
+
+    private Map<String, String> parsePasswordColumn(String downloadId) throws Exception {
+        CredentialArtifact artifact = CredentialArtifactStore.get(downloadId);
+        assertTrue(artifact != null, "artifact should be in the store");
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(artifact.getXlsxBytes()))) {
+            Map<String, String> passwords = new LinkedHashMap<>();
+            for (Row row : workbook.getSheetAt(0)) {
+                if (row.getRowNum() == 0) {
+                    continue;
+                }
+                Cell roll = row.getCell(0);
+                Cell password = row.getCell(2);
+                if (roll != null && password != null) {
+                    passwords.put(roll.getStringCellValue(), password.getStringCellValue());
+                }
+            }
+            return passwords;
+        }
     }
 
     @Test

@@ -1,11 +1,16 @@
 package com.dagacs.controller;
 
 import com.dagacs.dto.StudentImportResult;
+import com.dagacs.service.CredentialArtifact;
+import com.dagacs.service.CredentialArtifactStore;
 import com.dagacs.service.StudentImportService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -14,22 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 
-/**
- * M9.10 Admin bulk student import endpoint (ADMIN-only).
- * <p>
- * Sits under {@code /api/admin/**} so the existing security rule in
- * {@code SecurityConfig} applies, plus an explicit per-method
- * {@code @PreAuthorize("hasRole('ADMIN')")} mirroring the sibling admin
- * controllers. The JWT/role model is untouched.
- * </p>
- * <p>
- * Response semantics follow existing DAGACS HTTP conventions: 200 on a fully
- * imported file, 400 for validation/file errors, 409 when any rejected row is a
- * duplicate/conflict, 401 unauthenticated, 403 non-ADMIN. The body is the
- * SOW-mandated import summary; when rows are rejected {@code importedRows} is
- * 0 (all-or-nothing).
- * </p>
- */
 @RestController
 @RequestMapping("/api/admin/students/import")
 public class StudentImportController {
@@ -56,5 +45,26 @@ public class StudentImportController {
             status = conflict ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
         }
         return ResponseEntity.status(status).body(result);
+    }
+
+    @GetMapping("/credentials/{downloadId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> downloadCredentials(@PathVariable String downloadId) {
+        CredentialArtifact artifact = CredentialArtifactStore.get(downloadId);
+        if (artifact == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!artifact.tryMarkDownloaded()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .header(HttpHeaders.RETRY_AFTER, "1")
+                    .build();
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(
+                MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "student_credentials.xlsx");
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(artifact.getXlsxBytes());
     }
 }

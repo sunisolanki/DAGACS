@@ -144,7 +144,7 @@ class StudentProvisioningAcceptanceIntegrationTest {
     }
 
     @Test
-    void adminCreatesStudent_thenStudentCanLoginAndReachStudentApi() throws Exception {
+    void adminCreatesStudent_autoProvisionsLogin_tempPasswordForcesChange() throws Exception {
         String email = freshEmail("student-");
         long sectionId = createSectionEnv();
         String token = adminToken();
@@ -156,22 +156,45 @@ class StudentProvisioningAcceptanceIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.loginLinked").value(false))
-                .andReturn();
-        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-
-        mockMvc.perform(post("/api/admin/students/" + id + "/login")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\",\"status\":\"ACTIVE\"}"))
-                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.loginLinked").value(true))
-                .andExpect(jsonPath("$.loginStatus").value("ACTIVE"));
+                .andExpect(jsonPath("$.loginStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn();
+        String temporaryPassword = objectMapper
+                .readTree(created.getResponse().getContentAsString())
+                .get("temporaryPassword").asText();
 
-        String studentToken = loginToken(email, "StuPass#1");
+        // the temporary password is the real persisted password: it logs in
+        String studentToken = loginToken(email, temporaryPassword);
         mockMvc.perform(get("/api/student/attendance/my")
                         .header("Authorization", "Bearer " + studentToken))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createStudent_noEmail_noLoginProvisioned() throws Exception {
+        long sectionId = createSectionEnv();
+        String token = adminToken();
+        String rollNumber = "STU" + Math.abs(System.nanoTime());
+        String body = "{"
+                + "\"rollNumber\":\"" + rollNumber + "\","
+                + "\"name\":\"No Email Student\","
+                + "\"gender\":\"M\","
+                + "\"age\":20,"
+                + "\"admissionDate\":\"2026-01-01\","
+                + "\"programId\":" + this.programId + ","
+                + "\"batchId\":" + this.batchId + ","
+                + "\"sectionId\":" + sectionId
+                + "}";
+
+        mockMvc.perform(post("/api/admin/students")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loginLinked").value(false))
+                .andExpect(jsonPath("$.temporaryPassword").doesNotExist());
     }
 
     @Test
@@ -201,7 +224,7 @@ class StudentProvisioningAcceptanceIntegrationTest {
     }
 
     @Test
-    void provisionLogin_again_returns409() throws Exception {
+    void reProvisioningAnAutoProvisionedLogin_returns409() throws Exception {
         String email = freshEmail("twice-");
         long sectionId = createSectionEnv();
         String token = adminToken();
@@ -211,15 +234,12 @@ class StudentProvisioningAcceptanceIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(studentCreateBody(email, sectionId)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loginLinked").value(true))
                 .andReturn();
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 
-        mockMvc.perform(post("/api/admin/students/" + id + "/login")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\"}"))
-                .andExpect(status().isCreated());
-
+        // the login was already auto-provisioned, so an explicit provision is a
+        // duplicate and must keep returning 409
         mockMvc.perform(post("/api/admin/students/" + id + "/login")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -240,11 +260,10 @@ class StudentProvisioningAcceptanceIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/admin/students/" + id + "/login")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\"}"))
-                .andExpect(status().isCreated());
+        String temporaryPassword = objectMapper
+                .readTree(created.getResponse().getContentAsString())
+                .get("temporaryPassword").asText();
+        loginToken(email, temporaryPassword);
 
         mockMvc.perform(patch("/api/admin/students/" + id + "/login/status")
                         .header("Authorization", "Bearer " + token)
@@ -256,12 +275,12 @@ class StudentProvisioningAcceptanceIntegrationTest {
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"StuPass#1\"}"))
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + temporaryPassword + "\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void resettingStudentPassword_oldPasswordFails_newPasswordWorks() throws Exception {
+    void resettingStudentPassword_oldPasswordFails_newPasswordWorks_andForcesChange() throws Exception {
         String email = freshEmail("reset-");
         long sectionId = createSectionEnv();
         String token = adminToken();
@@ -273,25 +292,37 @@ class StudentProvisioningAcceptanceIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/admin/students/" + id + "/login")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\"}"))
-                .andExpect(status().isCreated());
-        loginToken(email, "StuPass#1");
+        String temporaryPassword = objectMapper
+                .readTree(created.getResponse().getContentAsString())
+                .get("temporaryPassword").asText();
 
         mockMvc.perform(put("/api/admin/students/" + id + "/login/password")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"NewStuPass#456\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(true));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"StuPass#1\"}"))
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + temporaryPassword + "\"}"))
                 .andExpect(status().isUnauthorized());
 
+        // admin reset forces the change: the new password logs in but the
+        // password-change gate still blocks normal student APIs
         String newToken = loginToken(email, "NewStuPass#456");
+        mockMvc.perform(get("/api/student/attendance/my")
+                        .header("Authorization", "Bearer " + newToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/student/change-password")
+                        .header("Authorization", "Bearer " + newToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"NewStuPass#456\","
+                                + "\"newPassword\":\"NewStuPass#789\","
+                                + "\"confirmPassword\":\"NewStuPass#789\"}"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/student/attendance/my")
                         .header("Authorization", "Bearer " + newToken))
                 .andExpect(status().isOk());
@@ -308,13 +339,9 @@ class StudentProvisioningAcceptanceIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(studentCreateBody(email, sectionId)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.loginLinked").value(true))
                 .andReturn();
         long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/admin/students/" + id + "/login")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\"}"))
-                .andExpect(status().isCreated());
 
         mockMvc.perform(put("/api/admin/students/" + id)
                         .header("Authorization", "Bearer " + token)

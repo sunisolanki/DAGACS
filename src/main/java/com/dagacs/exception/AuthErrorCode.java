@@ -26,4 +26,6 @@ public final class AuthErrorCode {
     public static final String HOD_PROFILE_INACTIVE = "HOD_PROFILE_INACTIVE";
     public static final String HOD_NOT_DESIGNATED = "HOD_NOT_DESIGNATED";
     public static final String HOD_NO_DEPARTMENT = "HOD_NO_DEPARTMENT";
+
+    public static final String STUDENT_PASSWORD_CHANGE_REQUIRED = "STUDENT_PASSWORD_CHANGE_REQUIRED";
 }

@@ -35,7 +35,8 @@ public class AuthService {
     }
 
     public AuthResponse login(AuthRequest request) {
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+        String identifier = resolveIdentifier(request);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(identifier);
         String rawPassword = userDetails.getPassword();
 
         if (!passwordEncoder.matches(request.getPassword(), rawPassword)) {
@@ -48,13 +49,26 @@ public class AuthService {
                         .map(a -> a.getAuthority().replace("ROLE_", ""))
                         .toList());
 
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
 
         return AuthResponse.builder()
                 .token(token)
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole().getName())
+                .mustChangePassword(user.isMustChangePassword())
                 .build();
+    }
+
+    private String resolveIdentifier(AuthRequest request) {
+        String identifier = request.getIdentifier();
+        if (identifier != null && !identifier.isBlank()) {
+            return identifier.trim();
+        }
+        String email = request.getEmail();
+        if (email != null && !email.isBlank()) {
+            return email.trim();
+        }
+        throw new AuthException("Identifier is required", 400);
     }
 }

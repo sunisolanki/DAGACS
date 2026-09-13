@@ -82,7 +82,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         byte[] rawBody = readRawBody(request);
-        String email = parseEmail(rawBody);
+        String email = parseIdentifier(rawBody);
         String clientIp = clientIp(request);
 
         if (isBlocked(email, clientIp, response)) {
@@ -164,17 +164,20 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private String parseEmail(byte[] body) {
+    private String parseIdentifier(byte[] body) {
         if (body == null || body.length == 0) {
             return null;
         }
         try {
             JsonNode node = objectMapper.readTree(body);
-            String email = node.path("email").asText(null);
-            if (email == null || email.isBlank()) {
+            String identifier = node.path("identifier").asText(null);
+            if (identifier == null || identifier.isBlank()) {
+                identifier = node.path("email").asText(null);
+            }
+            if (identifier == null || identifier.isBlank()) {
                 return null;
             }
-            return email.trim().toLowerCase(Locale.ROOT);
+            return identifier.trim();
         } catch (IOException ignored) {
             return null;
         }

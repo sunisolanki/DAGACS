@@ -55,6 +55,7 @@ D:\DAGACS\backend\src\test\java\com\dagacs\controller\StudentManagementControlle
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\AdminTeacherAssignmentControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\TeacherProvisioningAcceptanceIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\dto\AttendanceMarkRequestDTOTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\security\StudentPasswordChangeIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\StudentProfileControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\M72ExportIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\ProgramControllerTest.java

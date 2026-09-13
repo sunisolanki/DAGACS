@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * M5.2-specific repository over the shared {@code students} master-data table.
@@ -21,6 +22,8 @@ public interface StudentManagementRepository extends JpaRepository<Student, Long
     boolean existsByRollNumber(String rollNumber);
 
     boolean existsByEmail(String email);
+
+    Optional<Student> findByRollNumber(String rollNumber);
 
     List<Student> findAllByOrderByNameAsc();
 }

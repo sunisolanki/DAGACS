@@ -5,6 +5,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\AttendanceRecordDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentLoginRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\StudentManagementController.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentChangePasswordRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\AcademicSessionController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Semester.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\HodSectionAttendanceDTO.java
@@ -34,6 +35,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\controller\SemesterController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\TeacherRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\SubjectService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Department.java
+D:\DAGACS\backend\src\main\java\com\dagacs\service\StudentPasswordChangeService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodAnalyticsController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\ReportFileNames.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\ProgramRepository.java
@@ -50,6 +52,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\service\AttendanceCalculationService.
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\HodDailyLectureReportDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\BatchService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AuthService.java
+D:\DAGACS\backend\src\main\java\com\dagacs\controller\StudentPasswordChangeController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\SubjectOfferingService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\TeacherAssignmentService.java
@@ -69,6 +72,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\entity\Subject.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherManagementDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AttendanceService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\RoleRepository.java
+D:\DAGACS\backend\src\main\java\com\dagacs\service\CredentialArtifactStore.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\AttendancePercentageDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodDesignationController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodIdentityController.java
@@ -108,6 +112,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\config\AcademicSessionLegacySchemaMig
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\SemesterRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\security\JwtAuthenticationFilter.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Batch.java
+D:\DAGACS\backend\src\main\java\com\dagacs\service\CredentialArtifact.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectOfferingDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherLoginRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SectionDTO.java

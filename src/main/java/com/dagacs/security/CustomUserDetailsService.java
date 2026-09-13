@@ -1,7 +1,9 @@
 package com.dagacs.security;
 
+import com.dagacs.entity.Student;
 import com.dagacs.entity.Role;
 import com.dagacs.entity.User;
+import com.dagacs.repository.StudentManagementRepository;
 import com.dagacs.repository.UserRepository;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.GrantedAuthority;
@@ -18,15 +20,20 @@ import java.util.List;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final StudentManagementRepository studentManagementRepository;
 
-    public CustomUserDetailsService(UserRepository userRepository) {
+    public CustomUserDetailsService(UserRepository userRepository,
+                                    StudentManagementRepository studentManagementRepository) {
         this.userRepository = userRepository;
+        this.studentManagementRepository = studentManagementRepository;
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+        User user = resolveUser(identifier);
+        if (user == null) {
+            throw new UsernameNotFoundException("User not found: " + identifier);
+        }
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new DisabledException("Account is disabled");
         }
@@ -35,6 +42,18 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .password(user.getPassword())
                 .authorities(getAuthorities(user))
                 .build();
+    }
+
+    private User resolveUser(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return null;
+        }
+        String trimmed = identifier.trim();
+        Student student = studentManagementRepository.findByRollNumber(trimmed).orElse(null);
+        if (student != null && student.getEmail() != null && !student.getEmail().isBlank()) {
+            return userRepository.findByEmail(student.getEmail().toLowerCase()).orElse(null);
+        }
+        return userRepository.findByEmail(trimmed.toLowerCase()).orElse(null);
     }
 
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {
