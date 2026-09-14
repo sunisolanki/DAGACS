@@ -10,12 +10,13 @@ import java.time.LocalDateTime;
 /**
  * M9.3 response DTO for a teaching assignment.
  *
- * <p>Carries the three relational identities ({@code teacherId},
- * {@code subjectOfferingId}, {@code sectionId}) plus the fully derived
- * display context: Subject / Semester / AcademicSession / Program /
- * Department resolve through the SubjectOffering, while Batch resolves
- * through the Section. This is exactly what the admin Master Data screen
- * and the M9.4 teacher self-service screen render.</p>
+ * <p>Carries the assignment identity ({@code teacherId},
+ * {@code subjectOfferingId}) exactly one of {@code sectionId} or
+ * {@code batchId} plus the fully derived display context: Subject /
+ * Semester / AcademicSession / Program / Department resolve through the
+ * SubjectOffering, while Batch resolves through the Section in section mode
+ * and directly in batch mode. This is exactly what the admin Master Data
+ * screen and the M9.4 teacher self-service screen render.</p>
  */
 @Data
 @Builder

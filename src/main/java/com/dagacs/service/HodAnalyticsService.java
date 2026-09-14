@@ -53,8 +53,10 @@ public class HodAnalyticsService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        long recorded = analyticsRepository.countRecordedByDepartmentAndDateRange(deptId, start, end);
-        long present = analyticsRepository.countPresentByDepartmentAndDateRange(deptId, start, end);
+        long recorded = analyticsRepository.countRecordedByDepartmentAndDateRange(deptId, start, end)
+                + analyticsRepository.countRecordedByDepartmentAndDateRangeBatch(deptId, start, end);
+        long present = analyticsRepository.countPresentByDepartmentAndDateRange(deptId, start, end)
+                + analyticsRepository.countPresentByDepartmentAndDateRangeBatch(deptId, start, end);
 
         return HodDashboardDTO.builder()
                 .departmentName(hod.getDepartment().getName())
@@ -99,7 +101,8 @@ public class HodAnalyticsService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        return analyticsRepository.aggregateAttendanceBySubject(deptId, start, end).stream()
+        java.util.List<HodSubjectAttendanceDTO> sectionRows = analyticsRepository
+                .aggregateAttendanceBySubject(deptId, start, end).stream()
                 .map(row -> HodSubjectAttendanceDTO.builder()
                         .subjectCode(row.getSubjectCode())
                         .subjectName(row.getSubjectName())
@@ -108,6 +111,20 @@ public class HodAnalyticsService {
                         .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
                         .build())
                 .toList();
+        // Phase-2 additive batch twin.
+        java.util.List<HodSubjectAttendanceDTO> batchRows = analyticsRepository
+                .aggregateAttendanceBySubjectBatch(deptId, start, end).stream()
+                .map(row -> HodSubjectAttendanceDTO.builder()
+                        .subjectCode(row.getSubjectCode())
+                        .subjectName(row.getSubjectName())
+                        .presentCount(row.getPresentCount())
+                        .totalRecordedCount(row.getTotalRecorded())
+                        .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
+                        .build())
+                .toList();
+        java.util.List<HodSubjectAttendanceDTO> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        return merged;
     }
 
     @Transactional(readOnly = true)
@@ -116,7 +133,8 @@ public class HodAnalyticsService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        return analyticsRepository.aggregateAttendanceByStudent(deptId, start, end).stream()
+        java.util.List<HodStudentAttendanceDTO> sectionRows = analyticsRepository
+                .aggregateAttendanceByStudent(deptId, start, end).stream()
                 .map(row -> HodStudentAttendanceDTO.builder()
                         .rollNumber(row.getRollNumber())
                         .studentName(row.getStudentName())
@@ -126,6 +144,21 @@ public class HodAnalyticsService {
                         .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
                         .build())
                 .toList();
+        // Phase-2 additive batch twin (section alias holds the batch code).
+        java.util.List<HodStudentAttendanceDTO> batchRows = analyticsRepository
+                .aggregateAttendanceByStudentBatch(deptId, start, end).stream()
+                .map(row -> HodStudentAttendanceDTO.builder()
+                        .rollNumber(row.getRollNumber())
+                        .studentName(row.getStudentName())
+                        .batchName(row.getSectionName())
+                        .presentCount(row.getPresentCount())
+                        .totalRecordedCount(row.getTotalRecorded())
+                        .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
+                        .build())
+                .toList();
+        java.util.List<HodStudentAttendanceDTO> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        return merged;
     }
 
     @Transactional(readOnly = true)
@@ -134,7 +167,8 @@ public class HodAnalyticsService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        return analyticsRepository.aggregateLowAttendanceStudents(deptId, start, end).stream()
+        java.util.List<HodLowAttendanceDTO> sectionRows = analyticsRepository
+                .aggregateLowAttendanceStudents(deptId, start, end).stream()
                 .map(row -> HodLowAttendanceDTO.builder()
                         .rollNumber(row.getRollNumber())
                         .studentName(row.getStudentName())
@@ -144,6 +178,21 @@ public class HodAnalyticsService {
                         .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
                         .build())
                 .toList();
+        // Phase-2 additive batch twin (section alias holds the batch code).
+        java.util.List<HodLowAttendanceDTO> batchRows = analyticsRepository
+                .aggregateLowAttendanceStudentsBatch(deptId, start, end).stream()
+                .map(row -> HodLowAttendanceDTO.builder()
+                        .rollNumber(row.getRollNumber())
+                        .studentName(row.getStudentName())
+                        .batchName(row.getSectionName())
+                        .presentCount(row.getPresentCount())
+                        .totalRecordedCount(row.getTotalRecorded())
+                        .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
+                        .build())
+                .toList();
+        java.util.List<HodLowAttendanceDTO> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        return merged;
     }
 
     @Transactional(readOnly = true)
@@ -155,8 +204,10 @@ public class HodAnalyticsService {
         List<RollupAggregation> rows;
         if ("monthly".equalsIgnoreCase(type)) {
             rows = analyticsRepository.aggregateMonthlyRollup(deptId, start, end);
+            rows = mergeRollup(rows, analyticsRepository.aggregateMonthlyRollupBatch(deptId, start, end));
         } else if ("quarterly".equalsIgnoreCase(type)) {
             rows = analyticsRepository.aggregateQuarterlyRollup(deptId, start, end);
+            rows = mergeRollup(rows, analyticsRepository.aggregateQuarterlyRollupBatch(deptId, start, end));
         } else {
             throw new AuthException("type must be either monthly or quarterly", 400);
         }
@@ -177,7 +228,8 @@ public class HodAnalyticsService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        return analyticsRepository.findAuditLogsByDepartmentAndDateRange(deptId, start, end).stream()
+        java.util.List<HodAuditLogEntryDTO> sectionRows = analyticsRepository
+                .findAuditLogsByDepartmentAndDateRange(deptId, start, end).stream()
                 .map(al -> HodAuditLogEntryDTO.builder()
                         .studentName(al.getStudentName())
                         .rollNo(al.getRollNo())
@@ -191,10 +243,42 @@ public class HodAnalyticsService {
                         .reason(al.getReason())
                         .build())
                 .toList();
+        // Phase-2 additive batch twin.
+        java.util.List<HodAuditLogEntryDTO> batchRows = analyticsRepository
+                .findAuditLogsByDepartmentAndDateRangeBatch(deptId, start, end).stream()
+                .map(al -> HodAuditLogEntryDTO.builder()
+                        .studentName(al.getStudentName())
+                        .rollNo(al.getRollNo())
+                        .subjectName(al.getSubjectName())
+                        .batchName(al.getBatchName())
+                        .date(al.getDate())
+                        .previousStatus(al.getPreviousStatus())
+                        .newStatus(al.getNewStatus())
+                        .updatedBy(al.getUpdatedBy())
+                        .updatedAt(al.getUpdatedAt())
+                        .reason(al.getReason())
+                        .build())
+                .toList();
+        java.util.List<HodAuditLogEntryDTO> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        merged.sort(java.util.Comparator.comparing(HodAuditLogEntryDTO::getUpdatedAt,
+                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+        return merged;
     }
 
     private Teacher resolveHod() {
         return hodResolver.resolve();
+    }
+
+    /**
+     * Phase-2 additive merge: concat the frozen (section) rollup rows with the
+     * batch twin rows.
+     */
+    private static List<RollupAggregation> mergeRollup(List<RollupAggregation> sectionRows,
+                                                       List<RollupAggregation> batchRows) {
+        java.util.List<RollupAggregation> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        return merged;
     }
 
     private Long resolveDepartmentId() {

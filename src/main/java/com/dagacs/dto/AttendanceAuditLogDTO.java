@@ -48,6 +48,10 @@ public class AttendanceAuditLogDTO {
     @Size(max = 100, message = "Section name snapshot must not exceed 100 characters")
     private String sectionName;
 
+    private String batch;
+
+    private String batchName;
+
     @NotBlank(message = "Date is required")
     @Size(max = 20, message = "Date must not exceed 20 characters")
     private String date;

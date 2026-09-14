@@ -70,13 +70,17 @@ public class AttendanceService {
                         "Attendance session not found with ID: " + request.getSessionId(), 404));
 
         Teacher teacher = teacherResolver.resolve();
-        authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        if (session.getSectionEntity() != null) {
+            authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        } else {
+            authorizeBatchTeacher(teacher, session.getSubjectEntity().getId(), session.getBatchEntity().getId());
+        }
 
         if ("CANCELLED".equals(session.getStatus())) {
             throw new AuthException("Cannot mark attendance on a cancelled session", 409);
         }
 
-        Section sessionSection = session.getSectionEntity();
+        boolean batchSession = session.getSectionEntity() == null;
         if (request.getItems().stream().anyMatch(item -> item == null)) {
             throw new AuthException("Each attendance item must be provided", 400);
         }
@@ -113,10 +117,18 @@ public class AttendanceService {
             if (student == null) {
                 throw new AuthException("Student not found with ID: " + item.getStudentId(), 404);
             }
-            if (student.getSection() == null
-                    || !student.getSection().getId().equals(sessionSection.getId())) {
-                throw new AuthException(
-                        "Student " + item.getStudentId() + " does not belong to the session's section", 400);
+            if (batchSession) {
+                if (student.getBatch() == null
+                        || !student.getBatch().getId().equals(session.getBatchEntity().getId())) {
+                    throw new AuthException(
+                            "Student " + item.getStudentId() + " does not belong to the session's batch", 400);
+                }
+            } else {
+                if (student.getSection() == null
+                        || !student.getSection().getId().equals(session.getSectionEntity().getId())) {
+                    throw new AuthException(
+                            "Student " + item.getStudentId() + " does not belong to the session's section", 400);
+                }
             }
             if (!STATUS_ACTIVE.equals(student.getStatus())) {
                 throw new AuthException(
@@ -138,7 +150,8 @@ public class AttendanceService {
                             .session(session)
                             .student(student)
                             .subject(session.getSubjectEntity())
-                            .section(sessionSection)
+                            .section(batchSession ? null : session.getSectionEntity())
+                            .batch(batchSession ? session.getBatchEntity() : null)
                             .markedBy(teacher)
                             .status(item.getStatus())
                             .lecturePeriod(session.getLecturePeriod())
@@ -160,7 +173,11 @@ public class AttendanceService {
 
         AttendanceSession session = record.getSession();
         Teacher teacher = teacherResolver.resolve();
-        authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        if (session.getSectionEntity() != null) {
+            authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        } else {
+            authorizeBatchTeacher(teacher, session.getSubjectEntity().getId(), session.getBatchEntity().getId());
+        }
 
         if ("CANCELLED".equals(session.getStatus())) {
             throw new AuthException("Cannot update attendance on a cancelled session", 409);
@@ -194,7 +211,11 @@ public class AttendanceService {
                 .orElseThrow(() -> new AuthException(
                         "Attendance session not found with ID: " + sessionId, 404));
         Teacher teacher = teacherResolver.resolve();
-        authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        if (session.getSectionEntity() != null) {
+            authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        } else {
+            authorizeBatchTeacher(teacher, session.getSubjectEntity().getId(), session.getBatchEntity().getId());
+        }
         return attendanceRecordRepository.findBySessionId(sessionId).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -206,12 +227,20 @@ public class AttendanceService {
         }
     }
 
+    private void authorizeBatchTeacher(Teacher teacher, Long subjectId, Long batchId) {
+        if (!assignmentRepository.existsByTeacherIdAndBatchIdAndSubjectOfferingSubjectId(teacher.getId(), batchId, subjectId)) {
+            throw new AuthException("Teacher is not assigned to this subject and batch", 403);
+        }
+    }
+
     private AttendanceRecordDTO convertToDTO(AttendanceRecord record) {
+        Section section = record.getSection();
         return AttendanceRecordDTO.builder()
                 .id(record.getId())
                 .studentId(record.getStudent().getId())
                 .subjectId(record.getSubject().getId())
-                .sectionId(record.getSection().getId())
+                .sectionId(section != null ? section.getId() : null)
+                .batchId(section == null ? record.getBatch().getId() : null)
                 .status(record.getStatus())
                 .lecturePeriod(record.getLecturePeriod())
                 .date(record.getDate())

@@ -13,10 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * M9.3 acceptance tests for the teacher-assignment request contract: exactly
- * three relational identities (teacherId, subjectOfferingId, sectionId), all
- * mandatory. No subjectId, semesterId, academicSessionId, programId,
- * departmentId, batchId or studentId may appear in the request payload.
+ * M9.3 acceptance tests for the teacher-assignment request contract: the
+ * relational identities teacherId and subjectOfferingId are mandatory;
+ * exactly one of sectionId | batchId is required (XOR enforced at the
+ * service boundary, not by bean validation). No subjectId, semesterId,
+ * academicSessionId, programId, departmentId or studentId may appear in the
+ * request payload.
  */
 class TeacherAssignmentDTOValidationTest {
 
@@ -64,15 +66,17 @@ class TeacherAssignmentDTOValidationTest {
     }
 
     @Test
-    void missingSectionId_violation() {
+    void missingSectionId_allowed_noViolation() {
+        // Phase 2: section is optional on the request DTO; the XOR of
+        // {sectionId, batchId} is enforced at the service boundary.
         TeacherAssignmentRequestDTO dto = validRequest();
         dto.setSectionId(null);
-        assertFalse(validator.validate(dto).isEmpty());
-        assertTrue(hasViolationOn(dto, "sectionId"));
+        dto.setBatchId(4L);
+        assertTrue(validator.validate(dto).isEmpty());
     }
 
     @Test
-    void requestCarriesExactlyThreeRelationalIdentities() {
+    void requestCarriesOnlyAllowedRelationalIdentities() {
         assertTrue(validRequest().getTeacherId() != null);
         assertTrue(validRequest().getSubjectOfferingId() != null);
         assertTrue(validRequest().getSectionId() != null);
@@ -81,7 +85,6 @@ class TeacherAssignmentDTOValidationTest {
         assertFalse(validRequest().toString().contains("academicSessionId"));
         assertFalse(validRequest().toString().contains("programId"));
         assertFalse(validRequest().toString().contains("departmentId"));
-        assertFalse(validRequest().toString().contains("batchId"));
         assertFalse(validRequest().toString().contains("studentId"));
     }
 }

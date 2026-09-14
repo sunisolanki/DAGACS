@@ -5,6 +5,7 @@ import com.dagacs.dto.AttendanceSessionDTO;
 import com.dagacs.dto.AttendanceSessionUpdateRequestDTO;
 import com.dagacs.dto.StudentDTO;
 import com.dagacs.entity.AttendanceSession;
+import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
 import com.dagacs.entity.Subject;
@@ -12,6 +13,7 @@ import com.dagacs.entity.Teacher;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AttendanceRecordRepository;
 import com.dagacs.repository.AttendanceSessionRepository;
+import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.StudentRepository;
 import com.dagacs.repository.SubjectRepository;
@@ -37,6 +39,7 @@ public class AttendanceSessionService {
     private final AttendanceSessionRepository attendanceSessionRepository;
     private final SubjectRepository subjectRepository;
     private final SectionRepository sectionRepository;
+    private final BatchRepository batchRepository;
     private final TeacherSubjectSectionAssignmentRepository assignmentRepository;
     private final StudentRepository studentRepository;
     private final AuthenticatedTeacherResolver teacherResolver;
@@ -53,6 +56,7 @@ public class AttendanceSessionService {
     public AttendanceSessionService(AttendanceSessionRepository attendanceSessionRepository,
                                     SubjectRepository subjectRepository,
                                     SectionRepository sectionRepository,
+                                    BatchRepository batchRepository,
                                     TeacherSubjectSectionAssignmentRepository assignmentRepository,
                                     StudentRepository studentRepository,
                                     AuthenticatedTeacherResolver teacherResolver,
@@ -60,6 +64,7 @@ public class AttendanceSessionService {
         this.attendanceSessionRepository = attendanceSessionRepository;
         this.subjectRepository = subjectRepository;
         this.sectionRepository = sectionRepository;
+        this.batchRepository = batchRepository;
         this.assignmentRepository = assignmentRepository;
         this.studentRepository = studentRepository;
         this.teacherResolver = teacherResolver;
@@ -68,8 +73,14 @@ public class AttendanceSessionService {
 
     @Transactional
     public AttendanceSessionDTO createSession(AttendanceSessionCreateRequestDTO dto) {
-        if (dto.getSubjectId() == null || dto.getSectionId() == null) {
-            throw new AuthException("Subject and section are required", 400);
+        if (dto.getSubjectId() == null) {
+            throw new AuthException("Subject is required", 400);
+        }
+        if (dto.getSectionId() != null && dto.getBatchId() != null) {
+            throw new AuthException("Provide exactly one of sectionId or batchId, not both.", 400);
+        }
+        if (dto.getSectionId() == null && dto.getBatchId() == null) {
+            throw new AuthException("Provide exactly one of sectionId or batchId.", 400);
         }
         if (dto.getLecturePeriod() == null || dto.getLecturePeriod().trim().isEmpty()) {
             throw new AuthException("Lecture period is required", 400);
@@ -83,23 +94,33 @@ public class AttendanceSessionService {
 
         Subject subject = subjectRepository.findById(dto.getSubjectId())
                 .orElseThrow(() -> new AuthException("Subject not found with ID: " + dto.getSubjectId(), 404));
-        Section section = sectionRepository.findById(dto.getSectionId())
-                .orElseThrow(() -> new AuthException("Section not found with ID: " + dto.getSectionId(), 404));
+        SessionContext context = resolveContext(dto);
 
-        authorizeTeacher(teacher, subject.getId(), section.getId());
-
-        if (attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
-                subject.getId(), section.getId(), dto.getDate(), dto.getLecturePeriod())) {
-            throw new AuthException("An attendance session already exists for this subject, section, date, and period", 409);
+        if (context.section != null) {
+            authorizeTeacher(teacher, subject.getId(), context.section.getId());
+            if (attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
+                    subject.getId(), context.section.getId(), dto.getDate(), dto.getLecturePeriod())) {
+                throw new AuthException(
+                        "An attendance session already exists for this subject, section, date, and period", 409);
+            }
+        } else {
+            authorizeBatchTeacher(teacher, subject.getId(), context.batch.getId());
+            if (attendanceSessionRepository.existsBySubjectEntityIdAndBatchEntityIdAndDateAndLecturePeriod(
+                    subject.getId(), context.batch.getId(), dto.getDate(), dto.getLecturePeriod())) {
+                throw new AuthException(
+                        "An attendance session already exists for this subject, batch, date, and period", 409);
+            }
         }
 
         LocalDateTime now = LocalDateTime.now();
         AttendanceSession session = AttendanceSession.builder()
                 .subjectEntity(subject)
-                .sectionEntity(section)
+                .sectionEntity(context.section)
+                .batchEntity(context.batch)
                 .teacherEntity(teacher)
                 .subject(subject.getName())
-                .section(section.getName())
+                .section(context.section != null ? context.section.getName() : null)
+                .batch(context.batch != null ? context.batch.getBatchCode() : null)
                 .teacher(teacher.getFullName())
                 .lecturePeriod(dto.getLecturePeriod())
                 .date(dto.getDate())
@@ -131,10 +152,17 @@ public class AttendanceSessionService {
         AttendanceSession session = attendanceSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new AuthException("Attendance session not found with ID: " + sessionId, 404));
         Teacher teacher = teacherResolver.resolve();
-        authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        if (session.getSectionEntity() != null) {
+            authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        } else {
+            authorizeBatchTeacher(teacher, session.getSubjectEntity().getId(), session.getBatchEntity().getId());
+        }
 
-        List<Student> students = studentRepository.findBySectionIdAndStatusOrderByNameAsc(
-                session.getSectionEntity().getId(), "ACTIVE");
+        List<Student> students = session.getSectionEntity() != null
+                ? studentRepository.findBySectionIdAndStatusOrderByNameAsc(
+                        session.getSectionEntity().getId(), "ACTIVE")
+                : studentRepository.findByBatchIdAndStatusOrderByNameAsc(
+                        session.getBatchEntity().getId(), "ACTIVE");
         return students.stream()
                 .map(s -> StudentDTO.builder()
                         .id(s.getId())
@@ -150,7 +178,11 @@ public class AttendanceSessionService {
                 .orElseThrow(() -> new AuthException("Attendance session not found with ID: " + id, 404));
 
         Teacher teacher = teacherResolver.resolve();
-        authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        if (session.getSectionEntity() != null) {
+            authorizeTeacher(teacher, session.getSubjectEntity().getId(), session.getSectionEntity().getId());
+        } else {
+            authorizeBatchTeacher(teacher, session.getSubjectEntity().getId(), session.getBatchEntity().getId());
+        }
 
         if (dto.getLecturePeriod() == null || dto.getLecturePeriod().trim().isEmpty()) {
             throw new AuthException("Lecture period is required", 400);
@@ -176,10 +208,20 @@ public class AttendanceSessionService {
                 throw new AuthException(
                         "Cannot change session date or lecture period after attendance has been recorded", 409);
             }
-            if (attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
-                    session.getSubjectEntity().getId(), session.getSectionEntity().getId(),
-                    dto.getDate(), dto.getLecturePeriod())) {
-                throw new AuthException("An attendance session already exists for this subject, section, date, and period", 409);
+            if (session.getSectionEntity() != null) {
+                if (attendanceSessionRepository.existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
+                        session.getSubjectEntity().getId(), session.getSectionEntity().getId(),
+                        dto.getDate(), dto.getLecturePeriod())) {
+                    throw new AuthException(
+                            "An attendance session already exists for this subject, section, date, and period", 409);
+                }
+            } else {
+                if (attendanceSessionRepository.existsBySubjectEntityIdAndBatchEntityIdAndDateAndLecturePeriod(
+                        session.getSubjectEntity().getId(), session.getBatchEntity().getId(),
+                        dto.getDate(), dto.getLecturePeriod())) {
+                    throw new AuthException(
+                            "An attendance session already exists for this subject, batch, date, and period", 409);
+                }
             }
         }
 
@@ -197,6 +239,30 @@ public class AttendanceSessionService {
         }
     }
 
+    private void authorizeBatchTeacher(Teacher teacher, Long subjectId, Long batchId) {
+        if (!assignmentRepository.existsByTeacherIdAndBatchIdAndSubjectOfferingSubjectId(teacher.getId(), batchId, subjectId)) {
+            throw new AuthException("Teacher is not assigned to this subject and batch", 403);
+        }
+    }
+
+    /**
+     * Resolve the section-or-batch session context. Batch mode requires the
+     * structural precondition that the batch has no sections.
+     */
+    private SessionContext resolveContext(AttendanceSessionCreateRequestDTO dto) {
+        if (dto.getSectionId() != null) {
+            Section section = sectionRepository.findById(dto.getSectionId())
+                    .orElseThrow(() -> new AuthException("Section not found with ID: " + dto.getSectionId(), 404));
+            return new SessionContext(section, null);
+        }
+        Batch batch = batchRepository.findById(dto.getBatchId())
+                .orElseThrow(() -> new AuthException("Batch not found with ID: " + dto.getBatchId(), 404));
+        if (!sectionRepository.findByBatch(batch).isEmpty()) {
+            throw new AuthException("Batch has sections; use sectionId instead of batchId.", 400);
+        }
+        return new SessionContext(null, batch);
+    }
+
     private void rejectFutureDate(String date) {
         if (LocalDate.parse(date).isAfter(LocalDate.now(clock))) {
             throw new AuthException("Attendance date cannot be in the future", 400);
@@ -204,12 +270,18 @@ public class AttendanceSessionService {
     }
 
     private AttendanceSessionDTO convertToDTO(AttendanceSession session) {
+        Section section = session.getSectionEntity();
+        Batch batch = session.getBatchEntity() != null
+                ? session.getBatchEntity()
+                : (section != null ? section.getBatch() : null);
         return AttendanceSessionDTO.builder()
                 .id(session.getId())
                 .subjectId(session.getSubjectEntity().getId())
                 .subjectName(session.getSubjectEntity().getName())
-                .sectionId(session.getSectionEntity().getId())
-                .sectionName(session.getSectionEntity().getName())
+                .sectionId(section != null ? section.getId() : null)
+                .sectionName(section != null ? section.getName() : null)
+                .batchId(batch != null ? batch.getId() : null)
+                .batchName(batch != null ? batch.getBatchCode() : null)
                 .teacherId(session.getTeacherEntity().getId())
                 .lecturePeriod(session.getLecturePeriod())
                 .date(session.getDate())
@@ -217,4 +289,6 @@ public class AttendanceSessionService {
                 .createdAt(session.getCreatedAt())
                 .build();
     }
+
+    private record SessionContext(Section section, Batch batch) {}
 }

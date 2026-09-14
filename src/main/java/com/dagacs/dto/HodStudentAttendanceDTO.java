@@ -17,6 +17,8 @@ public class HodStudentAttendanceDTO {
 
     private String sectionName;
 
+    private String batchName;
+
     private Long presentCount;
 
     private Long totalRecordedCount;

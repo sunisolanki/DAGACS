@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.security.AssignmentLifecycleIntegrityIntegrationTest
 -------------------------------------------------------------------------------
-Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.017 s -- in com.dagacs.security.AssignmentLifecycleIntegrityIntegrationTest
+Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.15 s -- in com.dagacs.security.AssignmentLifecycleIntegrityIntegrationTest

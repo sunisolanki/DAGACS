@@ -6,6 +6,7 @@ import com.dagacs.entity.Teacher;
 import com.dagacs.repository.HodReportRepository;
 import com.dagacs.security.AuthenticatedHodResolver;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,8 @@ public class HodReportService {
         String end = toCanonicalString(endDate);
         Pageable pageable = pageRequest(page, size);
 
-        return reportRepository.findDailyLectureByDepartmentAndDateRange(deptId, start, end, pageable)
+        Page<HodDailyLectureReportDTO> sectionPage = reportRepository
+                .findDailyLectureByDepartmentAndDateRange(deptId, start, end, pageable)
                 .map(row -> HodDailyLectureReportDTO.builder()
                         .date(row.getDate())
                         .lecturePeriod(row.getLecturePeriod())
@@ -55,6 +57,20 @@ public class HodReportService {
                         .totalRecordedCount(row.getTotalRecorded())
                         .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
                         .build());
+        // Phase-2 additive batch twin.
+        Page<HodDailyLectureReportDTO> batchPage = reportRepository
+                .findDailyLectureByDepartmentAndDateRangeBatch(deptId, start, end, pageable)
+                .map(row -> HodDailyLectureReportDTO.builder()
+                        .date(row.getDate())
+                        .lecturePeriod(row.getLecturePeriod())
+                        .subjectCode(row.getSubjectCode())
+                        .subjectName(row.getSubjectName())
+                        .batchCode(row.getBatchCode())
+                        .presentCount(row.getPresentCount())
+                        .totalRecordedCount(row.getTotalRecorded())
+                        .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
+                        .build());
+        return mergePages(sectionPage, batchPage);
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +81,8 @@ public class HodReportService {
         String end = toCanonicalString(endDate);
         Pageable pageable = pageRequest(page, size);
 
-        return reportRepository.findCoverageByDepartmentAndDateRange(deptId, start, end, pageable)
+        Page<HodCoverageReportDTO> sectionPage = reportRepository
+                .findCoverageByDepartmentAndDateRange(deptId, start, end, pageable)
                 .map(row -> HodCoverageReportDTO.builder()
                         .subjectCode(row.getSubjectCode())
                         .subjectName(row.getSubjectName())
@@ -74,11 +91,33 @@ public class HodReportService {
                         .recordedDateCount(row.getRecordedDateCount())
                         .sessionCount(row.getSessionCount())
                         .build());
+        // Phase-2 additive batch twin.
+        Page<HodCoverageReportDTO> batchPage = reportRepository
+                .findCoverageByDepartmentAndDateRangeBatch(deptId, start, end, pageable)
+                .map(row -> HodCoverageReportDTO.builder()
+                        .subjectCode(row.getSubjectCode())
+                        .subjectName(row.getSubjectName())
+                        .batchCode(row.getBatchCode())
+                        .recordedDateCount(row.getRecordedDateCount())
+                        .sessionCount(row.getSessionCount())
+                        .build());
+        return mergePages(sectionPage, batchPage);
     }
 
     private Long resolveDepartmentId() {
         Teacher hod = hodResolver.resolve();
         return hod.getDepartment().getId();
+    }
+
+    /**
+     * Phase-2 additive merge: section rows first, then the batch twin rows.
+     * Total elements is the sum of the two pages' totals (report context rows).
+     */
+    private static <T> Page<T> mergePages(Page<T> sectionPage, Page<T> batchPage) {
+        java.util.List<T> merged = new java.util.ArrayList<>(sectionPage.getContent());
+        merged.addAll(batchPage.getContent());
+        long total = sectionPage.getTotalElements() + batchPage.getTotalElements();
+        return new PageImpl<>(merged, sectionPage.getPageable(), total);
     }
 
     private static Pageable pageRequest(int page, int size) {

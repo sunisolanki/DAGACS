@@ -152,6 +152,93 @@ public interface HodAnalyticsRepository extends JpaRepository<AttendanceRecord, 
                                                                    @Param("startDate") String startDate,
                                                                    @Param("endDate") String endDate);
 
+    // ----- Phase-2 additive batch twins (recorded through ar.batch) -----
+    // Additive only; the section-based queries above are frozen and untouched.
+
+    @Query("SELECT COUNT(ar) FROM AttendanceRecord ar "
+            + "JOIN ar.batch bat JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate)")
+    long countRecordedByDepartmentAndDateRangeBatch(@Param("deptId") Long deptId,
+                                                    @Param("startDate") String startDate,
+                                                    @Param("endDate") String endDate);
+
+    @Query("SELECT COUNT(ar) FROM AttendanceRecord ar "
+            + "JOIN ar.batch bat JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId AND ar.isPresent = true "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate)")
+    long countPresentByDepartmentAndDateRangeBatch(@Param("deptId") Long deptId,
+                                                   @Param("startDate") String startDate,
+                                                   @Param("endDate") String endDate);
+
+    @Query("SELECT sub.id AS subjectId, sub.code AS subjectCode, sub.name AS subjectName, "
+            + "COUNT(ar) AS totalRecorded, "
+            + "SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) AS presentCount "
+            + "FROM AttendanceRecord ar JOIN ar.batch bat JOIN bat.academicSession acs JOIN acs.program p "
+            + "JOIN ar.subject sub "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate) "
+            + "GROUP BY sub.id, sub.code, sub.name")
+    List<SubjectAggregation> aggregateAttendanceBySubjectBatch(@Param("deptId") Long deptId,
+                                                               @Param("startDate") String startDate,
+                                                               @Param("endDate") String endDate);
+
+    @Query("SELECT st.rollNumber AS rollNumber, st.name AS studentName, bat.batchCode AS sectionName, "
+            + "COUNT(ar) AS totalRecorded, "
+            + "SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) AS presentCount "
+            + "FROM AttendanceRecord ar JOIN ar.student st JOIN ar.batch bat "
+            + "JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate) "
+            + "GROUP BY st.id, st.rollNumber, st.name, bat.id, bat.batchCode")
+    List<StudentAggregation> aggregateAttendanceByStudentBatch(@Param("deptId") Long deptId,
+                                                               @Param("startDate") String startDate,
+                                                               @Param("endDate") String endDate);
+
+    @Query("SELECT st.rollNumber AS rollNumber, st.name AS studentName, bat.batchCode AS sectionName, "
+            + "COUNT(ar) AS totalRecorded, "
+            + "SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) AS presentCount "
+            + "FROM AttendanceRecord ar JOIN ar.student st JOIN ar.batch bat "
+            + "JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate) "
+            + "GROUP BY st.id, st.rollNumber, st.name, bat.id, bat.batchCode "
+            + "HAVING (SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) * 100.0 / COUNT(ar)) < 75.0")
+    List<StudentAggregation> aggregateLowAttendanceStudentsBatch(@Param("deptId") Long deptId,
+                                                                 @Param("startDate") String startDate,
+                                                                 @Param("endDate") String endDate);
+
+    @Query("SELECT SUBSTRING(ar.date, 1, 7) AS period, "
+            + "COUNT(ar) AS totalRecorded, "
+            + "SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) AS presentCount "
+            + "FROM AttendanceRecord ar JOIN ar.batch bat JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate) "
+            + "GROUP BY period ORDER BY period")
+    List<RollupAggregation> aggregateMonthlyRollupBatch(@Param("deptId") Long deptId,
+                                                        @Param("startDate") String startDate,
+                                                        @Param("endDate") String endDate);
+
+    @Query("SELECT CONCAT(CONCAT(SUBSTRING(ar.date, 1, 4), '-'), " + QUARTER_EXPR + ") AS period, "
+            + "COUNT(ar) AS totalRecorded, "
+            + "SUM(CASE WHEN ar.isPresent = true THEN 1 ELSE 0 END) AS presentCount "
+            + "FROM AttendanceRecord ar JOIN ar.batch bat JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR ar.date >= :startDate) AND (:endDate IS NULL OR ar.date <= :endDate) "
+            + "GROUP BY period ORDER BY period")
+    List<RollupAggregation> aggregateQuarterlyRollupBatch(@Param("deptId") Long deptId,
+                                                          @Param("startDate") String startDate,
+                                                          @Param("endDate") String endDate);
+
+    @Query("SELECT al FROM AttendanceAuditLog al JOIN al.attendance ar JOIN ar.batch bat "
+            + "JOIN bat.academicSession acs JOIN acs.program p "
+            + "WHERE p.department.id = :deptId "
+            + "AND (:startDate IS NULL OR al.date >= :startDate) AND (:endDate IS NULL OR al.date <= :endDate) "
+            + "ORDER BY al.updatedAt DESC")
+    List<AttendanceAuditLog> findAuditLogsByDepartmentAndDateRangeBatch(@Param("deptId") Long deptId,
+                                                                        @Param("startDate") String startDate,
+                                                                        @Param("endDate") String endDate);
+
     // ----- Projections -----
 
     interface SectionAggregation {

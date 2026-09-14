@@ -56,6 +56,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\controller\StudentPasswordChangeContr
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\SubjectOfferingService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\TeacherAssignmentService.java
+D:\DAGACS\backend\src\main\java\com\dagacs\config\BatchLevelAttendanceSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\security\LoginRateLimitProperties.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\AttendanceMarkItemDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\AttendanceAuditLogRepository.java

@@ -3,6 +3,9 @@ package com.dagacs.service;
 import com.dagacs.dto.AttendanceAuditLogDTO;
 import com.dagacs.entity.AttendanceAuditLog;
 import com.dagacs.entity.AttendanceRecord;
+import com.dagacs.entity.AttendanceSession;
+import com.dagacs.entity.Batch;
+import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AttendanceAuditLogRepository;
@@ -117,16 +120,23 @@ public class AttendanceAuditLogService {
                                               String reason) {
         Student student = record.getStudent();
         LocalDateTime now = LocalDateTime.now();
+        AttendanceSession session = record.getSession();
+        Section section = session.getSectionEntity();
+        Batch batch = session.getBatchEntity() != null
+                ? session.getBatchEntity()
+                : (section != null ? section.getBatch() : null);
         AttendanceAuditLog auditLog = AttendanceAuditLog.builder()
                 .attendance(record)
                 .student(student)
                 .rollNo(student.getRollNumber())
                 .studentName(student.getName())
-                .subject(record.getSession().getSubjectEntity().getCode())
-                .subjectName(record.getSession().getSubjectEntity().getName())
-                .section(record.getSession().getSectionEntity().getName())
-                .sectionName(record.getSession().getSectionEntity().getName())
-                .date(record.getSession().getDate())
+                .subject(session.getSubjectEntity().getCode())
+                .subjectName(session.getSubjectEntity().getName())
+                .section(section != null ? session.getSectionEntity().getName() : null)
+                .sectionName(section != null ? session.getSectionEntity().getName() : null)
+                .batch(batch != null && section == null ? batch.getBatchCode() : null)
+                .batchName(batch != null && section == null ? batch.getBatchCode() : null)
+                .date(session.getDate())
                 .previousStatus(previousStatus)
                 .newStatus(newStatus)
                 .updatedBy(updatedBy)
@@ -169,6 +179,8 @@ public class AttendanceAuditLogService {
                 .subjectName(auditLog.getSubjectName())
                 .section(auditLog.getSection())
                 .sectionName(auditLog.getSectionName())
+                .batch(auditLog.getBatch())
+                .batchName(auditLog.getBatchName())
                 .date(auditLog.getDate())
                 .previousStatus(auditLog.getPreviousStatus())
                 .newStatus(auditLog.getNewStatus())

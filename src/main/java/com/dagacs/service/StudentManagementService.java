@@ -234,7 +234,7 @@ public class StudentManagementService {
         student.setAdmissionDate(defaultValue(request.getAdmissionDate()));
         student.setProgram(resolveProgram(request.getProgramId()));
         student.setBatch(resolveBatch(request.getBatchId()));
-        student.setSection(resolveSection(request.getSectionId()));
+        student.setSection(resolveOptionalSection(request.getSectionId(), student.getBatch()));
         return student;
     }
 
@@ -266,9 +266,12 @@ public class StudentManagementService {
                 .orElseThrow(() -> new AuthException("Batch not found with ID: " + batchId, 404));
     }
 
-    private Section resolveSection(Long sectionId) {
+    private Section resolveOptionalSection(Long sectionId, Batch batch) {
         if (sectionId == null) {
-            throw new AuthException("Section is required", 400);
+            if (!sectionRepository.findByBatch(batch).isEmpty()) {
+                throw new AuthException("Section is required for this batch", 400);
+            }
+            return null;
         }
         return sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new AuthException("Section not found with ID: " + sectionId, 404));
@@ -281,7 +284,8 @@ public class StudentManagementService {
             throw new AuthException(
                     "Student program does not match batch academic session program", 400);
         }
-        if (!student.getSection().getBatch().getId().equals(student.getBatch().getId())) {
+        if (student.getSection() != null
+                && !student.getSection().getBatch().getId().equals(student.getBatch().getId())) {
             throw new AuthException("Section batch does not match selected batch", 400);
         }
     }
@@ -394,8 +398,8 @@ public class StudentManagementService {
                 .programName(student.getProgram().getName())
                 .batchId(student.getBatch().getId())
                 .batchName(student.getBatch().getName())
-                .sectionId(student.getSection().getId())
-                .sectionName(student.getSection().getName())
+                .sectionId(student.getSection() != null ? student.getSection().getId() : null)
+                .sectionName(student.getSection() != null ? student.getSection().getName() : null)
                 .loginLinked(user != null)
                 .loginStatus(user != null ? user.getStatus() : null)
                 .mustChangePassword(user != null && user.isMustChangePassword())

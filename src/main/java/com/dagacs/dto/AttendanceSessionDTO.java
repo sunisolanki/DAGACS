@@ -23,10 +23,13 @@ public class AttendanceSessionDTO {
 
     private String subjectName;
 
-    @NotNull(message = "Section ID is required")
     private Long sectionId;
 
     private String sectionName;
+
+    private Long batchId;
+
+    private String batchName;
 
     private Long teacherId;
 

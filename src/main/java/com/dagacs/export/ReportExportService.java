@@ -6,8 +6,11 @@ import com.dagacs.entity.Teacher;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.HodReportRepository;
 import com.dagacs.repository.HodReportRepository.HodCoverageAggregation;
+import com.dagacs.repository.HodReportRepository.HodCoverageBatchAggregation;
 import com.dagacs.repository.HodReportRepository.HodDailyLectureAggregation;
+import com.dagacs.repository.HodReportRepository.HodDailyLectureBatchAggregation;
 import com.dagacs.repository.TeacherReportRepository;
+import com.dagacs.repository.TeacherReportRepository.TeacherBatchAggregation;
 import com.dagacs.repository.TeacherReportRepository.TeacherSubjectAggregation;
 import com.dagacs.security.AuthenticatedHodResolver;
 import com.dagacs.security.AuthenticatedTeacherResolver;
@@ -122,10 +125,10 @@ public class ReportExportService {
         Page<HodDailyLectureAggregation> page = hodReportRepository
                 .findDailyLectureByDepartmentAndDateRange(deptId, start, end, Pageable.unpaged());
         List<String> headers = List.of("Date", "Lecture Period", "Subject Code", "Subject Name",
-                "Section Code", "Section Name", "Present", "Total Recorded", "Percentage (%)");
+                "Section Code", "Section Name", "Present", "Total Recorded", "Percentage (%)", "Batch Code");
         List<List<Object>> rows = new ArrayList<>();
         for (HodDailyLectureAggregation row : page.getContent()) {
-            rows.add(List.of(
+            rows.add(java.util.Arrays.asList(
                     row.getDate(),
                     row.getLecturePeriod(),
                     row.getSubjectCode(),
@@ -134,7 +137,24 @@ public class ReportExportService {
                     row.getSectionName(),
                     row.getPresentCount(),
                     row.getTotalRecorded(),
-                    computePercentage(row.getPresentCount(), row.getTotalRecorded())));
+                    computePercentage(row.getPresentCount(), row.getTotalRecorded()),
+                    null));
+        }
+        // Phase-2 additive batch twin.
+        Page<HodDailyLectureBatchAggregation> batchPage = hodReportRepository
+                .findDailyLectureByDepartmentAndDateRangeBatch(deptId, start, end, Pageable.unpaged());
+        for (HodDailyLectureBatchAggregation row : batchPage.getContent()) {
+            rows.add(java.util.Arrays.asList(
+                    row.getDate(),
+                    row.getLecturePeriod(),
+                    row.getSubjectCode(),
+                    row.getSubjectName(),
+                    null,
+                    null,
+                    row.getPresentCount(),
+                    row.getTotalRecorded(),
+                    computePercentage(row.getPresentCount(), row.getTotalRecorded()),
+                    row.getBatchCode()));
         }
         return new ExportData("Daily-Lecture Attendance Report", subtitle,
                 "Daily Lecture", headers, rows);
@@ -144,16 +164,30 @@ public class ReportExportService {
         Page<HodCoverageAggregation> page = hodReportRepository
                 .findCoverageByDepartmentAndDateRange(deptId, start, end, Pageable.unpaged());
         List<String> headers = List.of("Subject Code", "Subject Name", "Section Code",
-                "Section Name", "Recorded Date Count", "Session Count");
+                "Section Name", "Recorded Date Count", "Session Count", "Batch Code");
         List<List<Object>> rows = new ArrayList<>();
         for (HodCoverageAggregation row : page.getContent()) {
-            rows.add(List.of(
+            rows.add(java.util.Arrays.asList(
                     row.getSubjectCode(),
                     row.getSubjectName(),
                     row.getSectionCode(),
                     row.getSectionName(),
                     row.getRecordedDateCount(),
-                    row.getSessionCount()));
+                    row.getSessionCount(),
+                    null));
+        }
+        // Phase-2 additive batch twin.
+        Page<HodCoverageBatchAggregation> batchPage = hodReportRepository
+                .findCoverageByDepartmentAndDateRangeBatch(deptId, start, end, Pageable.unpaged());
+        for (HodCoverageBatchAggregation row : batchPage.getContent()) {
+            rows.add(java.util.Arrays.asList(
+                    row.getSubjectCode(),
+                    row.getSubjectName(),
+                    null,
+                    null,
+                    row.getRecordedDateCount(),
+                    row.getSessionCount(),
+                    row.getBatchCode()));
         }
         return new ExportData("Recording-Coverage Report", subtitle, "Coverage", headers, rows);
     }
@@ -176,11 +210,12 @@ public class ReportExportService {
     private ExportData buildLowAttendance(LocalDate startDate, LocalDate endDate, String subtitle) {
         List<HodLowAttendanceDTO> low = hodAnalyticsService.getLowAttendance(startDate, endDate);
         List<String> headers = List.of("Roll Number", "Student Name", "Section",
-                "Present", "Total Recorded", "Percentage (%)");
+                "Present", "Total Recorded", "Percentage (%)", "Batch");
         List<List<Object>> rows = new ArrayList<>();
         for (HodLowAttendanceDTO row : low) {
-            rows.add(List.of(row.getRollNumber(), row.getStudentName(), row.getSectionName(),
-                    row.getPresentCount(), row.getTotalRecordedCount(), row.getPercentage()));
+            rows.add(java.util.Arrays.asList(row.getRollNumber(), row.getStudentName(), row.getSectionName(),
+                    row.getPresentCount(), row.getTotalRecordedCount(), row.getPercentage(),
+                    row.getBatchName()));
         }
         return new ExportData("Low-Attendance Report", subtitle, "Low Attendance", headers, rows);
     }
@@ -194,13 +229,23 @@ public class ReportExportService {
         List<TeacherSubjectAggregation> reportRows = teacherReportRepository
                 .findSubjectReportByTeacherAndDateRange(teacher.getId(), start, end);
         List<String> headers = List.of("Subject Code", "Subject Name", "Section Code",
-                "Section Name", "Present", "Total Recorded", "Percentage (%)");
+                "Section Name", "Present", "Total Recorded", "Percentage (%)", "Batch Code");
         List<List<Object>> rows = new ArrayList<>();
         for (TeacherSubjectAggregation row : reportRows) {
-            rows.add(List.of(row.getSubjectCode(), row.getSubjectName(),
+            rows.add(java.util.Arrays.asList(row.getSubjectCode(), row.getSubjectName(),
                     row.getSectionCode(), row.getSectionName(),
                     row.getPresentCount(), row.getTotalRecorded(),
-                    computePercentage(row.getPresentCount(), row.getTotalRecorded())));
+                    computePercentage(row.getPresentCount(), row.getTotalRecorded()), null));
+        }
+        // Phase-2 additive batch twin.
+        List<TeacherBatchAggregation> batchRows = teacherReportRepository
+                .findBatchSubjectReportByTeacherAndDateRange(teacher.getId(), start, end);
+        for (TeacherBatchAggregation row : batchRows) {
+            rows.add(java.util.Arrays.asList(row.getSubjectCode(), row.getSubjectName(),
+                    null, null,
+                    row.getPresentCount(), row.getTotalRecorded(),
+                    computePercentage(row.getPresentCount(), row.getTotalRecorded()),
+                    row.getBatchCode()));
         }
         return new ExportData("Teacher Subject-Wise Attendance Report", subtitle,
                 "Subject-wise", headers, rows);

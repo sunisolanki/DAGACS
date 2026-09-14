@@ -18,8 +18,9 @@ public class AttendanceSessionCreateRequestDTO {
     @NotNull(message = "Subject ID is required")
     private Long subjectId;
 
-    @NotNull(message = "Section ID is required")
     private Long sectionId;
+
+    private Long batchId;
 
     @NotBlank(message = "Lecture period is required")
     @Size(max = 50, message = "Lecture period must not exceed 50 characters")

@@ -120,6 +120,7 @@ class TeacherAssignmentServiceTest {
 
     @Test
     void createAssignment_missingTeacher_returns404() {
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
         when(teacherRepository.findById(99L)).thenReturn(Optional.empty());
 
         AuthException ex = assertThrows(AuthException.class,
@@ -130,6 +131,7 @@ class TeacherAssignmentServiceTest {
 
     @Test
     void createAssignment_missingOffering_returns404() {
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
         when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher1));
         when(subjectOfferingRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -141,8 +143,6 @@ class TeacherAssignmentServiceTest {
 
     @Test
     void createAssignment_missingSection_returns404() {
-        when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher1));
-        when(subjectOfferingRepository.findById(60L)).thenReturn(Optional.of(offering));
         when(sectionRepository.findById(99L)).thenReturn(Optional.empty());
 
         AuthException ex = assertThrows(AuthException.class,
@@ -305,6 +305,7 @@ class TeacherAssignmentServiceTest {
     void createAssignment_inactiveTeacher_returns409() {
         Teacher inactive = Teacher.builder().id(3L).email("inactive@dagacs.local")
                 .fullName("Inactive Teacher").status("INACTIVE").build();
+        when(sectionRepository.findById(80L)).thenReturn(Optional.of(sectionA));
         when(teacherRepository.findById(3L)).thenReturn(Optional.of(inactive));
 
         AuthException ex = assertThrows(AuthException.class,

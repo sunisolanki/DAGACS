@@ -43,13 +43,23 @@ class AttendanceSessionCreateRequestDTOTest {
     }
 
     @Test
-    void nullSectionId_violation() {
+    void nullSectionId_allowed_noViolation() {
+        // Phase 2: section may be absent when the session targets a zero-section batch.
         AttendanceSessionCreateRequestDTO dto = validDTO();
         dto.setSectionId(null);
 
         Set<ConstraintViolation<AttendanceSessionCreateRequestDTO>> violations = validator.validate(dto);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("sectionId")));
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void nullBatchId_allowed_noViolation() {
+        // Phase 2: batch is optional on the request DTO; XOR is enforced at the service boundary.
+        AttendanceSessionCreateRequestDTO dto = validDTO();
+        dto.setBatchId(null);
+
+        Set<ConstraintViolation<AttendanceSessionCreateRequestDTO>> violations = validator.validate(dto);
+        assertTrue(violations.isEmpty());
     }
 
     @Test

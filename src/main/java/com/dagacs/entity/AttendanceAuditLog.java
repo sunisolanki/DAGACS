@@ -39,6 +39,17 @@ public class AttendanceAuditLog {
     @Column(name = "section_name", nullable = false)
     private String sectionName;
 
+    /**
+     * Batch-mode snapshot (e.g. "MTECH-SE-2025"), populated only for
+     * attendance records created against a batch-level session where no Section
+     * exists.
+     */
+    @Column
+    private String batch;
+
+    @Column(name = "batch_name")
+    private String batchName;
+
     @Column(nullable = false)
     private String date;
 

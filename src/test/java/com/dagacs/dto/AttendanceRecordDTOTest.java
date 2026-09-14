@@ -60,13 +60,23 @@ class AttendanceRecordDTOTest {
     }
 
     @Test
-    void nullSectionId_violation() {
+    void nullSectionId_allowed_noViolation() {
+        // Phase 2: section may be absent when the record targets a zero-section batch.
         AttendanceRecordDTO dto = validDTO();
         dto.setSectionId(null);
 
         Set<ConstraintViolation<AttendanceRecordDTO>> violations = validator.validate(dto);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getPropertyPath().toString().equals("sectionId")));
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void nullBatchId_allowed_noViolation() {
+        // Phase 2: batch is optional on the record DTO; XOR is enforced at the service boundary.
+        AttendanceRecordDTO dto = validDTO();
+        dto.setBatchId(null);
+
+        Set<ConstraintViolation<AttendanceRecordDTO>> violations = validator.validate(dto);
+        assertTrue(violations.isEmpty());
     }
 
     @Test

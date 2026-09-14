@@ -26,6 +26,12 @@ public class HodCoverageReportDTO {
     private String sectionName;
 
     /**
+     * Batch-level context for zero-section batch-mode sessions (Phase 2).
+     * Populated instead of the section fields.
+     */
+    private String batchCode;
+
+    /**
      * COUNT(DISTINCT AttendanceRecord.date) within scope/date-range — distinct dates
      * on which attendance records actually existed.
      */

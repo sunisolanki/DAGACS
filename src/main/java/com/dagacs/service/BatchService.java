@@ -8,6 +8,7 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
+import com.dagacs.repository.AttendanceRecordRepository;
 import com.dagacs.repository.AttendanceSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
@@ -31,6 +32,7 @@ public class BatchService {
     private final StudentRepository studentRepository;
     private final TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
+    private final AttendanceRecordRepository attendanceRecordRepository;
 
     @Autowired
     public BatchService(BatchRepository batchRepository,
@@ -38,13 +40,15 @@ public class BatchService {
                         SectionRepository sectionRepository,
                         StudentRepository studentRepository,
                         TeacherSubjectSectionAssignmentRepository teacherSubjectSectionAssignmentRepository,
-                        AttendanceSessionRepository attendanceSessionRepository) {
+                        AttendanceSessionRepository attendanceSessionRepository,
+                        AttendanceRecordRepository attendanceRecordRepository) {
         this.batchRepository = batchRepository;
         this.academicSessionRepository = academicSessionRepository;
         this.sectionRepository = sectionRepository;
         this.studentRepository = studentRepository;
         this.teacherSubjectSectionAssignmentRepository = teacherSubjectSectionAssignmentRepository;
         this.attendanceSessionRepository = attendanceSessionRepository;
+        this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
     @Transactional
@@ -148,9 +152,11 @@ public class BatchService {
         boolean sessionChanged = !batch.getAcademicSession().getId().equals(academicSession.getId());
         if (sessionChanged) {
             boolean hasAssignments = teacherSubjectSectionAssignmentRepository
-                    .existsBySectionBatchId(batch.getId());
+                    .existsBySectionBatchId(batch.getId())
+                    || teacherSubjectSectionAssignmentRepository.existsByBatchId(batch.getId());
             boolean hasAttendanceSessions = attendanceSessionRepository
-                    .existsBySectionEntityBatchId(batch.getId());
+                    .existsBySectionEntityBatchId(batch.getId())
+                    || attendanceSessionRepository.existsByBatchEntityId(batch.getId());
             if (hasAssignments || hasAttendanceSessions) {
                 throw new AuthException(
                         "Cannot move batch to a different academic session while teacher assignments or attendance sessions exist",
@@ -191,6 +197,21 @@ public class BatchService {
         if (sections != null && !sections.isEmpty()) {
             throw new AuthException("Cannot delete batch. Section(s) exist: " +
                     sections.stream().map(Section::getName).collect(Collectors.joining(", ")), 409);
+        }
+
+        // Phase-2 batch-mode guards: a zero-section batch can still be the target
+        // of batch-mode assignments, sessions, and attendance records.
+        if (teacherSubjectSectionAssignmentRepository.existsByBatchId(id)) {
+            throw new AuthException("Cannot delete batch while batch-level teacher assignments exist", 409);
+        }
+        if (attendanceSessionRepository.existsByBatchEntityId(id)) {
+            throw new AuthException("Cannot delete batch while batch-level attendance sessions exist", 409);
+        }
+        if (attendanceRecordRepository.existsByBatchId(id)) {
+            throw new AuthException("Cannot delete batch while batch-level attendance records exist", 409);
+        }
+        if (studentRepository.countByBatchId(id) > 0) {
+            throw new AuthException("Cannot delete batch while students are assigned", 409);
         }
 
         batchRepository.delete(batch);

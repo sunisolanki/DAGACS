@@ -72,6 +72,15 @@ public class SectionService {
             throw new AuthException("Section already exists in this batch: " + name, 409);
         }
 
+        // Phase-2 structural guard: adding the FIRST section to a batch that has
+        // batch-mode teacher assignments would flip the batch out of the
+        // zero-section batch mode those assignments were created under.
+        if (sectionRepository.findByBatch(batch).isEmpty()
+                && teacherSubjectSectionAssignmentRepository.existsByBatchId(batch.getId())) {
+            throw new AuthException(
+                    "Cannot add a section to this batch while batch-level teacher assignments exist", 409);
+        }
+
         LocalDateTime now = LocalDateTime.now();
         Section section = Section.builder()
                 .sectionCode(sectionCode)

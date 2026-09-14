@@ -28,6 +28,12 @@ public class HodDailyLectureReportDTO {
 
     private String sectionName;
 
+    /**
+     * Batch-level context for zero-section batch-mode sessions (Phase 2).
+     * Populated instead of the section fields.
+     */
+    private String batchCode;
+
     private Long presentCount;
 
     private Long totalRecordedCount;

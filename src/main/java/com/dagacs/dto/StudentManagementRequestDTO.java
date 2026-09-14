@@ -60,6 +60,5 @@ public class StudentManagementRequestDTO {
     @NotNull(message = "Batch is required")
     private Long batchId;
 
-    @NotNull(message = "Section is required")
     private Long sectionId;
 }

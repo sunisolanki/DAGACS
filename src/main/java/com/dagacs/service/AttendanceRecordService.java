@@ -2,11 +2,13 @@ package com.dagacs.service;
 
 import com.dagacs.dto.AttendanceRecordDTO;
 import com.dagacs.entity.AttendanceRecord;
+import com.dagacs.entity.Batch;
 import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
 import com.dagacs.entity.Subject;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AttendanceRecordRepository;
+import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.StudentRepository;
 import com.dagacs.repository.SubjectRepository;
@@ -25,16 +27,19 @@ public class AttendanceRecordService {
     private final StudentRepository studentRepository;
     private final SubjectRepository subjectRepository;
     private final SectionRepository sectionRepository;
+    private final BatchRepository batchRepository;
 
     @Autowired
     public AttendanceRecordService(AttendanceRecordRepository attendanceRecordRepository,
                                    StudentRepository studentRepository,
                                    SubjectRepository subjectRepository,
-                                   SectionRepository sectionRepository) {
+                                   SectionRepository sectionRepository,
+                                   BatchRepository batchRepository) {
         this.attendanceRecordRepository = attendanceRecordRepository;
         this.studentRepository = studentRepository;
         this.subjectRepository = subjectRepository;
         this.sectionRepository = sectionRepository;
+        this.batchRepository = batchRepository;
     }
 
     @Transactional
@@ -45,8 +50,11 @@ public class AttendanceRecordService {
         if (dto.getSubjectId() == null) {
             throw new AuthException("Subject ID is required", 400);
         }
-        if (dto.getSectionId() == null) {
-            throw new AuthException("Section ID is required", 400);
+        if (dto.getSectionId() != null && dto.getBatchId() != null) {
+            throw new AuthException("Provide exactly one of sectionId or batchId, not both.", 400);
+        }
+        if (dto.getSectionId() == null && dto.getBatchId() == null) {
+            throw new AuthException("Provide exactly one of sectionId or batchId.", 400);
         }
         if (dto.getStatus() == null || dto.getStatus().trim().isEmpty()) {
             throw new AuthException("Status is required", 400);
@@ -62,12 +70,26 @@ public class AttendanceRecordService {
                 .orElseThrow(() -> new AuthException("Student not found with ID: " + dto.getStudentId(), 404));
         Subject subject = subjectRepository.findById(dto.getSubjectId())
                 .orElseThrow(() -> new AuthException("Subject not found with ID: " + dto.getSubjectId(), 404));
-        Section section = sectionRepository.findById(dto.getSectionId())
-                .orElseThrow(() -> new AuthException("Section not found with ID: " + dto.getSectionId(), 404));
 
-        if (attendanceRecordRepository.existsByStudentIdAndSubjectIdAndSectionIdAndDate(
-                dto.getStudentId(), dto.getSubjectId(), dto.getSectionId(), dto.getDate())) {
-            throw new AuthException("Attendance already recorded for this student, subject, section, and date", 409);
+        Section section = null;
+        Batch batch = null;
+        if (dto.getSectionId() != null) {
+            section = sectionRepository.findById(dto.getSectionId())
+                    .orElseThrow(() -> new AuthException("Section not found with ID: " + dto.getSectionId(), 404));
+            if (attendanceRecordRepository.existsByStudentIdAndSubjectIdAndSectionIdAndDate(
+                    dto.getStudentId(), dto.getSubjectId(), dto.getSectionId(), dto.getDate())) {
+                throw new AuthException("Attendance already recorded for this student, subject, section, and date", 409);
+            }
+        } else {
+            batch = batchRepository.findById(dto.getBatchId())
+                    .orElseThrow(() -> new AuthException("Batch not found with ID: " + dto.getBatchId(), 404));
+            if (!sectionRepository.findByBatch(batch).isEmpty()) {
+                throw new AuthException("Batch has sections; use sectionId instead of batchId.", 400);
+            }
+            if (attendanceRecordRepository.existsByStudentIdAndSubjectIdAndBatchIdAndDate(
+                    dto.getStudentId(), dto.getSubjectId(), dto.getBatchId(), dto.getDate())) {
+                throw new AuthException("Attendance already recorded for this student, subject, batch, and date", 409);
+            }
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -75,6 +97,7 @@ public class AttendanceRecordService {
                 .student(student)
                 .subject(subject)
                 .section(section)
+                .batch(batch)
                 .status(dto.getStatus())
                 .lecturePeriod(dto.getLecturePeriod() != null ? dto.getLecturePeriod() : "")
                 .date(dto.getDate())
@@ -114,11 +137,13 @@ public class AttendanceRecordService {
     }
 
     private AttendanceRecordDTO convertToDTO(AttendanceRecord record) {
+        Section section = record.getSection();
         return AttendanceRecordDTO.builder()
                 .id(record.getId())
                 .studentId(record.getStudent().getId())
                 .subjectId(record.getSubject().getId())
-                .sectionId(record.getSection().getId())
+                .sectionId(section != null ? section.getId() : null)
+                .batchId(section == null ? record.getBatch().getId() : null)
                 .status(record.getStatus())
                 .lecturePeriod(record.getLecturePeriod())
                 .date(record.getDate())

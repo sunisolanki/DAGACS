@@ -57,7 +57,7 @@ public class Student {
     private Batch batch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "section_id", nullable = false)
+    @JoinColumn(name = "section_id")
     private Section section;
 
     @ManyToOne(fetch = FetchType.LAZY)

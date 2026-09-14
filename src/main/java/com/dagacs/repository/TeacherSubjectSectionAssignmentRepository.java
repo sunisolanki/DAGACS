@@ -19,14 +19,31 @@ public interface TeacherSubjectSectionAssignmentRepository extends JpaRepository
      */
     boolean existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(Long teacherId, Long sectionId, Long subjectId);
 
+    /**
+     * Phase-2 batch-mode authorization check: is the teacher assigned to teach a
+     * subject (resolved through their SubjectOffering) to the given batch
+     * (zero-section batch)? Resolves the subject identity via
+     * {@code subjectOffering.subject}. Rows whose legacy {@code subject_id} did
+     * not map to a subject_offering_id are never matched, so they can never
+     * authorize access.
+     */
+    boolean existsByTeacherIdAndBatchIdAndSubjectOfferingSubjectId(Long teacherId, Long batchId, Long subjectId);
+
     boolean existsByTeacherIdAndSubjectOfferingIdAndSectionId(Long teacherId, Long subjectOfferingId, Long sectionId);
 
+    boolean existsByTeacherIdAndSubjectOfferingIdAndBatchId(Long teacherId, Long subjectOfferingId, Long batchId);
+
     boolean existsBySectionId(Long sectionId);
+
+    boolean existsByBatchId(Long batchId);
 
     boolean existsBySectionBatchId(Long batchId);
 
     Optional<TeacherSubjectSectionAssignment> findByTeacherIdAndSubjectOfferingIdAndSectionId(
             Long teacherId, Long subjectOfferingId, Long sectionId);
+
+    Optional<TeacherSubjectSectionAssignment> findByTeacherIdAndSubjectOfferingIdAndBatchId(
+            Long teacherId, Long subjectOfferingId, Long batchId);
 
     boolean existsBySubjectOfferingId(Long subjectOfferingId);
 

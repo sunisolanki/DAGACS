@@ -22,6 +22,11 @@ public interface AttendanceSessionRepository extends JpaRepository<AttendanceSes
     boolean existsBySubjectEntityIdAndSectionEntityIdAndDateAndLecturePeriod(
             Long subjectId, Long sectionId, String date, String lecturePeriod);
 
+    boolean existsBySubjectEntityIdAndBatchEntityIdAndDateAndLecturePeriod(
+            Long subjectId, Long batchId, String date, String lecturePeriod);
+
+    boolean existsByBatchEntityId(Long batchId);
+
     /**
      * M9.15: teacher-scoped historical-attendance guard. Answers "did this
      * teacher create an attendance session in this subject + section context?"
@@ -30,4 +35,12 @@ public interface AttendanceSessionRepository extends JpaRepository<AttendanceSes
      */
     boolean existsByTeacherEntityIdAndSubjectEntityIdAndSectionEntityId(
             Long teacherId, Long subjectId, Long sectionId);
+
+    /**
+     * Phase-2 batch-mode M9.15 guard: did this teacher create an attendance
+     * session in this subject + batch context? Teacher-scoped so co-teacher
+     * batch assignments stay independent.
+     */
+    boolean existsByTeacherEntityIdAndSubjectEntityIdAndBatchEntityId(
+            Long teacherId, Long subjectId, Long batchId);
 }

@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.service.StudentManagementServiceTest
 -------------------------------------------------------------------------------
-Tests run: 44, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.357 s -- in com.dagacs.service.StudentManagementServiceTest
+Tests run: 44, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.844 s -- in com.dagacs.service.StudentManagementServiceTest

@@ -40,7 +40,7 @@ public class StudentProfileService {
                 .status(student.getStatus())
                 .batchName(student.getBatch().getName())
                 .programName(student.getProgram().getName())
-                .sectionName(student.getSection().getName())
+                .sectionName(student.getSection() != null ? student.getSection().getName() : null)
                 .build();
     }
 }

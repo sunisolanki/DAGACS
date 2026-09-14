@@ -21,6 +21,8 @@ public class HodAuditLogEntryDTO {
 
     private String sectionName;
 
+    private String batchName;
+
     private String date;
 
     private String previousStatus;

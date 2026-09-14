@@ -1,11 +1,13 @@
 com\dagacs\entity\Batch.class
 com\dagacs\repository\SectionRepository.class
+com\dagacs\service\TeacherAssignmentService$AssignmentTarget.class
 com\dagacs\repository\HodAnalyticsRepository.class
 com\dagacs\service\AccountProvisioningService.class
 com\dagacs\entity\SubjectOffering$SubjectOfferingBuilder.class
 com\dagacs\dto\AttendanceAuditLogDTO$AttendanceAuditLogDTOBuilder.class
 com\dagacs\service\TeacherManagementService.class
 com\dagacs\dto\TeacherUpdateRequestDTO.class
+com\dagacs\repository\TeacherReportRepository$TeacherBatchAggregation.class
 com\dagacs\dto\DepartmentDTO.class
 com\dagacs\config\AcademicSessionLegacySchemaMigration$LegacyColumn.class
 com\dagacs\service\AcademicSessionService.class
@@ -208,6 +210,7 @@ com\dagacs\entity\Role$RoleBuilder.class
 com\dagacs\dto\StudentImportResult$StudentImportResultBuilder.class
 com\dagacs\controller\ProgramController.class
 com\dagacs\studentimport\StudentImportParser.class
+com\dagacs\repository\HodReportRepository$HodDailyLectureBatchAggregation.class
 com\dagacs\repository\TeacherReportRepository$TeacherSubjectAggregation.class
 com\dagacs\dto\TeacherUpdateRequestDTO$TeacherUpdateRequestDTOBuilder.class
 com\dagacs\controller\SemesterController.class
@@ -228,6 +231,7 @@ com\dagacs\entity\AttendanceRecord.class
 com\dagacs\entity\TeacherSubjectSectionAssignment.class
 com\dagacs\service\SectionService.class
 com\dagacs\repository\DepartmentRepository.class
+com\dagacs\repository\HodReportRepository$HodCoverageBatchAggregation.class
 com\dagacs\dto\HodDailyLectureReportDTO$HodDailyLectureReportDTOBuilder.class
 com\dagacs\entity\TeacherSubjectSectionAssignment$TeacherSubjectSectionAssignmentBuilder.class
 com\dagacs\dto\HodIdentityDTO.class
@@ -244,6 +248,7 @@ com\dagacs\service\HodAnalyticsService.class
 com\dagacs\controller\AdminController.class
 com\dagacs\dto\StudentChangePasswordRequestDTO.class
 com\dagacs\service\AttendanceSessionService.class
+com\dagacs\service\AttendanceSessionService$SessionContext.class
 com\dagacs\repository\TeacherReportRepository.class
 com\dagacs\service\StudentAttendanceService.class
 com\dagacs\dto\HodDesignationRequestDTO.class
@@ -257,4 +262,5 @@ com\dagacs\dto\HodSectionAttendanceDTO$HodSectionAttendanceDTOBuilder.class
 com\dagacs\security\CustomUserDetailsService.class
 com\dagacs\controller\StudentController.class
 com\dagacs\dto\AttendanceMarkRequestDTO$AttendanceMarkRequestDTOBuilder.class
+com\dagacs\config\BatchLevelAttendanceSchemaMigration.class
 com\dagacs\controller\DepartmentController.class

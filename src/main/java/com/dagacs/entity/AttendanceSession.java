@@ -6,9 +6,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "attendance_sessions",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_session_class",
-                columnNames = {"subject_code", "section_code", "date", "lecture_period"}))
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_session_class",
+                        columnNames = {"subject_code", "section_code", "date", "lecture_period"}),
+                @UniqueConstraint(
+                        name = "uk_session_class_batch",
+                        columnNames = {"subject_code", "batch_code", "date", "lecture_period"})})
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AttendanceSession {
 
@@ -21,8 +25,12 @@ public class AttendanceSession {
     private Subject subjectEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "section_code", nullable = false)
+    @JoinColumn(name = "section_code")
     private Section sectionEntity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_code")
+    private Batch batchEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id", nullable = false)
@@ -39,10 +47,20 @@ public class AttendanceSession {
     /**
      * Legacy snapshot copy of {@code sectionEntity} kept synchronized with the
      * entity reference. {@code sectionEntity} is the source of truth; this string
-     * is never accepted independently from the client.
+     * is never accepted independently from the client. Null for batch-mode
+     * sessions.
      */
-    @Column(nullable = false)
+    @Column
     private String section;
+
+    /**
+     * Snapshot copy of {@code batchEntity} kept synchronized with the entity
+     * reference. {@code batchEntity} is the source of truth; this string is
+     * never accepted independently from the client. Set only for batch-mode
+     * sessions.
+     */
+    @Column
+    private String batch;
 
     /**
      * Legacy snapshot copy of {@code teacherEntity} kept synchronized with the

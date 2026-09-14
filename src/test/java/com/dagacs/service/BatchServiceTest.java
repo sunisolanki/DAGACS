@@ -9,6 +9,7 @@ import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.AttendanceSessionRepository;
+import com.dagacs.repository.AttendanceRecordRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.StudentRepository;
@@ -49,6 +50,9 @@ class BatchServiceTest {
 
     @Mock
     private AttendanceSessionRepository attendanceSessionRepository;
+
+    @Mock
+    private AttendanceRecordRepository attendanceRecordRepository;
 
     @InjectMocks
     private BatchService batchService;

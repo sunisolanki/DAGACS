@@ -35,7 +35,8 @@ public class TeacherReportService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
-        return reportRepository.findSubjectReportByTeacherAndDateRange(teacher.getId(), start, end).stream()
+        List<TeacherSubjectReportDTO> sectionRows = reportRepository
+                .findSubjectReportByTeacherAndDateRange(teacher.getId(), start, end).stream()
                 .map(row -> TeacherSubjectReportDTO.builder()
                         .subjectId(row.getSubjectId())
                         .subjectCode(row.getSubjectCode())
@@ -48,6 +49,25 @@ public class TeacherReportService {
                         .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
                         .build())
                 .toList();
+
+        // Phase-2 additive batch twin, appended after the frozen section rows.
+        List<TeacherSubjectReportDTO> batchRows = reportRepository
+                .findBatchSubjectReportByTeacherAndDateRange(teacher.getId(), start, end).stream()
+                .map(row -> TeacherSubjectReportDTO.builder()
+                        .subjectId(row.getSubjectId())
+                        .subjectCode(row.getSubjectCode())
+                        .subjectName(row.getSubjectName())
+                        .batchId(row.getBatchId())
+                        .batchCode(row.getBatchCode())
+                        .presentCount(row.getPresentCount())
+                        .totalRecordedCount(row.getTotalRecorded())
+                        .percentage(computePercentage(row.getPresentCount(), row.getTotalRecorded()))
+                        .build())
+                .toList();
+
+        List<TeacherSubjectReportDTO> merged = new java.util.ArrayList<>(sectionRows);
+        merged.addAll(batchRows);
+        return merged;
     }
 
     private static String toCanonicalString(LocalDate date) {

@@ -34,11 +34,21 @@ public class AttendanceRecord {
 
     /**
      * Denormalized snapshot of the session's section, kept synchronized with the
-     * session. Never accepted independently from the client.
+     * session. Never accepted independently from the client. Null for
+     * batch-mode sessions.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "section_id", nullable = false)
+    @JoinColumn(name = "section_id")
     private Section section;
+
+    /**
+     * Denormalized snapshot of the session's batch, kept synchronized with the
+     * session. Never accepted independently from the client. Set only for
+     * batch-mode sessions.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private Batch batch;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "marked_by", nullable = false)

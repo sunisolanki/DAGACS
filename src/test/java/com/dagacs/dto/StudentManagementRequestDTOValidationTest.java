@@ -15,8 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Bean Validation acceptance tests for the M5.2 create/update payload.
  * <p>
- * Approved scope: only rollNumber, name, programId, batchId and sectionId are
- * mandatory. All other fields are optional (null accepted) while their
+ * Approved scope: rollNumber, name, programId and batchId are mandatory.
+ * sectionId is optional (Phase 2: zero-section batches are valid; the
+ * section-required rule is enforced in the service against the batch).
+ * All other fields are optional (null accepted) while their
  * length/format constraints (when supplied) still apply.
  * </p>
  */
@@ -127,10 +129,12 @@ class StudentManagementRequestDTOValidationTest {
     }
 
     @Test
-    void missingSectionId_violation() {
+    void missingSectionId_allowed_noViolation() {
+        // Phase 2: section is optional here because zero-section batches exist; the
+        // section-required-vs-optional rule is enforced in the service against the batch.
         StudentManagementRequestDTO dto = onlyMandatoryFields();
         dto.setSectionId(null);
-        assertSingleViolationOn(dto, "sectionId");
+        assertTrue(validate(dto).isEmpty());
     }
 
     @Test

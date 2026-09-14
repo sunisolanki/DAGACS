@@ -24,8 +24,9 @@ public class AttendanceRecordDTO {
     @NotNull(message = "Subject ID is required")
     private Long subjectId;
 
-    @NotNull(message = "Section ID is required")
     private Long sectionId;
+
+    private Long batchId;
 
     @NotBlank(message = "Status is required")
     @Size(max = 20, message = "Status must not exceed 20 characters")

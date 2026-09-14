@@ -2,6 +2,7 @@ package com.dagacs.service;
 
 import com.dagacs.dto.AttendanceRecordDTO;
 import com.dagacs.entity.AttendanceRecord;
+import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
 import com.dagacs.repository.AttendanceRecordRepository;
 import com.dagacs.security.AuthenticatedStudentResolver;
@@ -40,11 +41,13 @@ public class StudentAttendanceService {
     }
 
     private AttendanceRecordDTO convertToDTO(AttendanceRecord record) {
+        Section section = record.getSection();
         return AttendanceRecordDTO.builder()
                 .id(record.getId())
                 .studentId(record.getStudent().getId())
                 .subjectId(record.getSubject().getId())
-                .sectionId(record.getSection().getId())
+                .sectionId(section != null ? section.getId() : null)
+                .batchId(section == null ? record.getBatch().getId() : null)
                 .status(record.getStatus())
                 .lecturePeriod(record.getLecturePeriod())
                 .date(record.getDate())

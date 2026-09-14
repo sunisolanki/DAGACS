@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -173,11 +174,16 @@ class AdminTeacherAssignmentControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void createTeacherAssignment_missingSectionId_returns400() throws Exception {
+    void createTeacherAssignment_withoutSectionOrBatch_reachesService() throws Exception {
+        // Phase 2: sectionId is no longer mandatory at the bean-validation layer;
+        // the exactly-one-of-{sectionId,batchId} XOR is enforced in the service.
+        when(teacherAssignmentService.createAssignment(any())).thenReturn(assignmentDTO());
+
         mockMvc.perform(post("/api/admin/teacher-assignments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"teacherId\":1,\"subjectOfferingId\":2}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated());
+        verify(teacherAssignmentService).createAssignment(any());
     }
 
     @Test

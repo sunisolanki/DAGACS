@@ -221,13 +221,15 @@ class StudentManagementControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void createStudent_missingSectionId_returns400() throws Exception {
+    void createStudent_missingSectionId_reachesService() throws Exception {
+        // Phase 2: sectionId is no longer mandatory at the bean-validation layer;
+        // the service enforces section-required-iff-batch-has-sections.
         mockMvc.perform(post("/api/admin/students")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"rollNumber\":\"2201CE001\",\"name\":\"Rahul\","
                                 + "\"programId\":1,\"batchId\":1}"))
-                .andExpect(status().isBadRequest());
-        verify(studentManagementService, never()).createStudent(any());
+                .andExpect(status().isCreated());
+        verify(studentManagementService).createStudent(any());
     }
 
     @Test

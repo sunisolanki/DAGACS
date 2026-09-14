@@ -30,6 +30,14 @@ public class TeacherSubjectReportDTO {
 
     private String sectionName;
 
+    /**
+     * Batch-level context for zero-section batch-mode assignments (Phase 2).
+     * Populated instead of the section fields; one of {section, batch} is set.
+     */
+    private Long batchId;
+
+    private String batchCode;
+
     private Long presentCount;
 
     private Long totalRecordedCount;
