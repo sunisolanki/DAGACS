@@ -75,6 +75,13 @@ class RoleEchoEndpointTest {
     }
 
     @Test
+    @WithMockUser(roles = "HOD")
+    void teacherEcho_withHodRole_returns403() throws Exception {
+        mockMvc.perform(get("/api/teacher/test"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(roles = "STUDENT")
     void studentEcho_withStudentRole_returns200() throws Exception {
         mockMvc.perform(get("/api/student/test"))

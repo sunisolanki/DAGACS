@@ -23,7 +23,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/teacher")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAnyRole('TEACHER', 'HOD')")
 public class TeacherReportController {
 
     private final TeacherReportService teacherReportService;

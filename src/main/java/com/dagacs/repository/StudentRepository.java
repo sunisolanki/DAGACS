@@ -16,6 +16,10 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     List<Student> findByBatchIdAndStatusOrderByNameAsc(Long batchId, String status);
 
+    List<Student> findBySectionIdAndStatusOrderByEnrollmentNumberAsc(Long sectionId, String status);
+
+    List<Student> findByBatchIdAndStatusOrderByEnrollmentNumberAsc(Long batchId, String status);
+
     Optional<Student> findByEmail(String email);
 
     Optional<Student> findByRollNumber(String rollNumber);

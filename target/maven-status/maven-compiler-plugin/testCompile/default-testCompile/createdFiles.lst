@@ -24,6 +24,7 @@ com\dagacs\service\SemesterServiceTest.class
 com\dagacs\dto\AttendanceAuditLogDTOTest.class
 com\dagacs\security\StudentPasswordChangeIntegrationTest.class
 com\dagacs\security\TeacherAttendanceOwnershipIntegrationTest$Slice.class
+com\dagacs\security\HodTeachingAccessIntegrationTest.class
 com\dagacs\controller\AdminTeacherAssignmentControllerTest.class
 com\dagacs\security\HodRoleParityIntegrationTest.class
 com\dagacs\controller\AttendanceControllerTest.class
@@ -31,6 +32,7 @@ com\dagacs\dto\AttendanceRecordDTOTest.class
 com\dagacs\repository\SubjectOfferingRepositoryTest.class
 com\dagacs\config\SectionSubjectSchemaMigrationTest.class
 com\dagacs\service\AttendanceServiceTest.class
+com\dagacs\security\StudentWiseIntegrationTest.class
 com\dagacs\service\StudentManagementServiceTest.class
 com\dagacs\repository\AttendanceAuditLogRepositoryTest.class
 com\dagacs\config\TeacherAssignmentSchemaMigrationTest.class
@@ -40,6 +42,7 @@ com\dagacs\security\M72ExportIntegrationTest.class
 com\dagacs\controller\StudentProfileControllerTest.class
 com\dagacs\security\HodAnalyticsIntegrationTest$Slice.class
 com\dagacs\security\StudentAttendanceOwnershipIntegrationTest.class
+com\dagacs\service\TeacherStudentWiseReportServiceTest.class
 com\dagacs\controller\TeacherAssignmentControllerTest.class
 com\dagacs\security\HodIdentityIntegrationTest.class
 com\dagacs\security\CorsTest.class
@@ -53,6 +56,7 @@ com\dagacs\export\PdfReportGeneratorTest.class
 com\dagacs\security\HodDesignationConcurrencyIntegrationTest.class
 com\dagacs\controller\SectionControllerTest.class
 com\dagacs\security\SecurityAuthTest.class
+com\dagacs\security\StudentWiseIntegrationTest$Slice.class
 com\dagacs\repository\AttendanceSessionRepositoryTest.class
 com\dagacs\studentimport\StudentImportParserTest.class
 com\dagacs\controller\SemesterControllerTest.class
@@ -62,6 +66,7 @@ com\dagacs\controller\StudentManagementControllerTest.class
 com\dagacs\service\DepartmentServiceTest.class
 com\dagacs\controller\SubjectControllerTest.class
 com\dagacs\security\AttendanceDataIntegrityIntegrationTest$Slice.class
+com\dagacs\security\BatchAttendanceIntegrationTest$Slice.class
 com\dagacs\security\LoginRateLimitEmailIntegrationTest.class
 com\dagacs\service\AccountProvisioningServiceTest.class
 com\dagacs\security\AssignmentConsistencyReassignmentIntegrationTest.class
@@ -82,10 +87,12 @@ com\dagacs\service\SubjectServiceTest.class
 com\dagacs\repository\AttendanceRecordRepositoryTest.class
 com\dagacs\security\StudentPasswordChangeIntegrationTest$LoginResult.class
 com\dagacs\security\StudentProfileIntegrationTest.class
+com\dagacs\security\BatchAttendanceIntegrationTest.class
 com\dagacs\dto\AttendanceSessionCreateRequestDTOTest.class
 com\dagacs\security\M72ExportIntegrationTest$1.class
 com\dagacs\security\StudentManagementSecurityIntegrationTest.class
 com\dagacs\security\M71ReportIntegrationTest.class
+com\dagacs\security\HodTeachingAccessIntegrationTest$Slice.class
 com\dagacs\controller\AttendanceCalculationControllerTest.class
 com\dagacs\security\RoleEchoEndpointTest.class
 com\dagacs\controller\DepartmentControllerTest.class
@@ -101,6 +108,7 @@ com\dagacs\security\AttendanceCalculationDateRangeIntegrationTest.class
 com\dagacs\security\AssignmentLifecycleIntegrityIntegrationTest$Slice.class
 com\dagacs\security\StudentProvisioningAcceptanceIntegrationTest.class
 com\dagacs\service\TeacherManagementServiceTest.class
+com\dagacs\security\M10C1StudentCreateLoginRealJwtIntegrationTest.class
 com\dagacs\security\AuthenticatedHodResolverTest.class
 com\dagacs\repository\AttendanceRecordAggregationRepositoryTest.class
 com\dagacs\export\ExcelReportGeneratorTest.class

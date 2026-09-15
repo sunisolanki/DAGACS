@@ -33,10 +33,14 @@ public class AttendanceAuditLog {
     @Column(name = "subject_name", nullable = false)
     private String subjectName;
 
-    @Column(nullable = false)
+    /**
+     * Section-mode snapshot (e.g. "CSE-A"); NULL for batch-mode records where a
+     * Section does not exist.
+     */
+    @Column
     private String section;
 
-    @Column(name = "section_name", nullable = false)
+    @Column(name = "section_name")
     private String sectionName;
 
     /**

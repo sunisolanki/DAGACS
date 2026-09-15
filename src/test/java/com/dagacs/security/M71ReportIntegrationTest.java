@@ -363,10 +363,13 @@ class M71ReportIntegrationTest {
     }
 
     @Test
-    void teacherReport_hodToken_returns403() throws Exception {
+    void teacherReport_hodToken_returnsAllowed() throws Exception {
+        Slice a = slice("A");
+        makeHod(a);
+        flush();
         String token = login(HOD_A_EMAIL, HOD_PASSWORD);
         mockMvc.perform(get("/api/teacher/attendance/report").header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test

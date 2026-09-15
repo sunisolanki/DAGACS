@@ -33,6 +33,8 @@ public class AttendanceService {
     private static final String STATUS_PRESENT = "PRESENT";
     private static final String STATUS_ABSENT = "ABSENT";
     private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_SCHEDULED = "SCHEDULED";
+    private static final String STATUS_CONDUCTED = "CONDUCTED";
 
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final AttendanceSessionRepository attendanceSessionRepository;
@@ -163,6 +165,13 @@ public class AttendanceService {
                 })
                 .collect(Collectors.toList());
 
+        // Attendance was successfully recorded: a SCHEDULED session becomes CONDUCTED.
+        // Responsibilities stay untouched - the attended session remains editable and a
+        // CANCELLED session remains blocked (validated above).
+        if (STATUS_SCHEDULED.equals(session.getStatus())) {
+            session.setStatus(STATUS_CONDUCTED);
+        }
+
         return saved.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
@@ -193,7 +202,10 @@ public class AttendanceService {
 
         String oldStatus = record.getStatus();
         if (oldStatus.equals(newStatus)) {
-            throw new AuthException("New status is the same as the current status", 400);
+            // Idempotent no-op: the record is already in the requested state.
+            // No save, no audit entry, and the (session_id, student_id) uniqueness
+            // constraint is untouched.
+            return convertToDTO(record);
         }
 
         record.setStatus(newStatus);

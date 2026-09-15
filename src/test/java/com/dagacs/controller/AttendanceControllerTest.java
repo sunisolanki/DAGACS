@@ -157,14 +157,15 @@ class AttendanceControllerTest {
 
     @Test
     @WithMockUser(roles = "TEACHER")
-    void updateAttendance_unchanged_returns400() throws Exception {
+    void updateAttendance_unchanged_returns200() throws Exception {
         when(attendanceService.updateAttendance(eq(1L), any(AttendanceUpdateRequestDTO.class)))
-                .thenThrow(new AuthException("New status is the same as the current status", 400));
+                .thenReturn(recordDto());
 
         mockMvc.perform(put("/api/teacher/attendance/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"newStatus\":\"PRESENT\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PRESENT"));
     }
 
     @Test
@@ -192,15 +193,6 @@ class AttendanceControllerTest {
         mockMvc.perform(post("/api/teacher/attendance/mark")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionId\":1,\"items\":[{\"studentId\":1,\"status\":\"PRESENT\"}]}"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "HOD")
-    void createSession_hodDenied_returns403() throws Exception {
-        mockMvc.perform(post("/api/teacher/attendance/sessions")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createSessionJson()))
                 .andExpect(status().isForbidden());
     }
 

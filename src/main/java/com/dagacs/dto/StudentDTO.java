@@ -22,4 +22,7 @@ public class StudentDTO {
     @NotBlank(message = "Name is required")
     @Size(max = 100, message = "Name must not exceed 100 characters")
     private String name;
+
+    @Size(max = 50, message = "Enrollment number must not exceed 50 characters")
+    private String enrollmentNumber;
 }

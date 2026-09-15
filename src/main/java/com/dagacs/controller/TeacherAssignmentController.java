@@ -31,7 +31,7 @@ public class TeacherAssignmentController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER', 'HOD')")
     public ResponseEntity<List<TeacherAssignmentDTO>> getMyAssignments() {
         Teacher teacher = teacherResolver.resolve();
         return ResponseEntity.ok(teacherAssignmentService.getAssignmentsForTeacher(teacher.getId()));

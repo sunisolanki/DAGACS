@@ -1,6 +1,5 @@
 package com.dagacs.controller;
 
-import com.dagacs.dto.StudentLoginRequestDTO;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
 import com.dagacs.dto.StudentPasswordUpdateRequestDTO;
@@ -74,10 +73,9 @@ public class StudentManagementController {
 
     @PostMapping("/{id}/login")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StudentManagementDTO> provisionLogin(
-            @PathVariable Long id, @Valid @RequestBody StudentLoginRequestDTO requestDTO) {
+    public ResponseEntity<StudentManagementDTO> provisionLogin(@PathVariable Long id) {
         return ResponseEntity.status(201)
-                .body(studentManagementService.provisionLogin(id, requestDTO));
+                .body(studentManagementService.provisionLogin(id));
     }
 
     @PatchMapping("/{id}/login/status")

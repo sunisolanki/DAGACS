@@ -27,7 +27,7 @@ import java.time.LocalDate;
  */
 @RestController
 @RequestMapping("/api/teacher")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAnyRole('TEACHER', 'HOD')")
 public class TeacherReportExportController {
 
     private static final String XLSX_MEDIA_TYPE =
@@ -62,6 +62,38 @@ public class TeacherReportExportController {
         byte[] bytes = exportService.exportTeacher(ExportFormat.PDF, startDate, endDate);
         return buildResponse(bytes, PDF_MEDIA_TYPE,
                 ReportFileNames.forTeacher(startDate, endDate, "pdf"));
+    }
+
+    @GetMapping("/attendance/student-wise/export.xlsx")
+    public ResponseEntity<byte[]> exportStudentWiseXlsx(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "subjectId") Long subjectId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId,
+            @RequestParam(name = "batchId", required = false) Long batchId) {
+        validateDateRange(startDate, endDate);
+        byte[] bytes = exportService.exportTeacherStudentWise(
+                ExportFormat.XLSX, startDate, endDate, subjectId, sectionId, batchId);
+        return buildResponse(bytes, XLSX_MEDIA_TYPE,
+                ReportFileNames.forTeacherStudentWise(startDate, endDate, "xlsx"));
+    }
+
+    @GetMapping("/attendance/student-wise/export.pdf")
+    public ResponseEntity<byte[]> exportStudentWisePdf(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "subjectId") Long subjectId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId,
+            @RequestParam(name = "batchId", required = false) Long batchId) {
+        validateDateRange(startDate, endDate);
+        byte[] bytes = exportService.exportTeacherStudentWise(
+                ExportFormat.PDF, startDate, endDate, subjectId, sectionId, batchId);
+        return buildResponse(bytes, PDF_MEDIA_TYPE,
+                ReportFileNames.forTeacherStudentWise(startDate, endDate, "pdf"));
     }
 
     private static ResponseEntity<byte[]> buildResponse(byte[] body, String mediaType, String fileName) {

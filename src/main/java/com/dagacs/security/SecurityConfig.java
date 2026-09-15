@@ -105,7 +105,7 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/hod/**").hasRole("HOD")
-                .requestMatchers("/api/teacher/**").hasRole("TEACHER")
+                .requestMatchers("/api/teacher/**").hasAnyRole("TEACHER", "HOD")
                 .requestMatchers("/api/student/**").hasRole("STUDENT")
                 .anyRequest().authenticated()
             )

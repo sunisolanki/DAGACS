@@ -64,6 +64,14 @@ public class BatchLevelAttendanceSchemaMigration implements ApplicationRunner {
         ensureAddNullable(AUDIT_LOGS, "batch", "VARCHAR(255)");
         ensureAddNullable(AUDIT_LOGS, "batch_name", "VARCHAR(255)");
 
+        // Legacy VARCHAR snapshot strings for Section-mode rows were created
+        // NOT NULL in the pre-batch schema. Batch-mode rows deliberately leave
+        // them unset, so they must be relaxed exactly like the BIGINT columns
+        // above; Hibernate's ddl-auto=update never drops an existing NOT NULL.
+        ensureNullable(SESSIONS, "section", "VARCHAR(255)");
+        ensureNullable(AUDIT_LOGS, "section", "VARCHAR(255)");
+        ensureNullable(AUDIT_LOGS, "section_name", "VARCHAR(255)");
+
         ensureAssignmentBatchConstraint();
         ensureSessionBatchConstraint();
         log.info("Batch-level attendance migration: schema review complete.");
@@ -75,6 +83,16 @@ public class BatchLevelAttendanceSchemaMigration implements ApplicationRunner {
      * fresh schema where Hibernate already creates the column as nullable.
      */
     private void ensureNullable(String table, String column) {
+        ensureNullable(table, column, "BIGINT");
+    }
+
+    /**
+     * Relaxes a NOT NULL column of an explicit JDBC type (e.g. a VARCHAR
+     * snapshot column) to NULL on existing deployments so that new batch-mode
+     * rows may leave it unset. Guarded on nullability; no-op on a fresh schema
+     * where Hibernate already creates the column as nullable.
+     */
+    private void ensureNullable(String table, String column, String type) {
         if (!tableExists(table) || !columnExists(table, column)) {
             return;
         }
@@ -82,7 +100,7 @@ public class BatchLevelAttendanceSchemaMigration implements ApplicationRunner {
         if (nullability != null && !"NO".equalsIgnoreCase(nullability)) {
             return;
         }
-        jdbcTemplate.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " BIGINT NULL");
+        jdbcTemplate.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + type + " NULL");
         log.info("Batch-level attendance migration: relaxed '{}.{}' to NULL.", table, column);
     }
 

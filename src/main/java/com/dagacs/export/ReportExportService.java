@@ -2,6 +2,7 @@ package com.dagacs.export;
 
 import com.dagacs.dto.HodLowAttendanceDTO;
 import com.dagacs.dto.HodRollupDTO;
+import com.dagacs.dto.StudentWiseReportDTO;
 import com.dagacs.entity.Teacher;
 import com.dagacs.exception.AuthException;
 import com.dagacs.repository.HodReportRepository;
@@ -15,6 +16,7 @@ import com.dagacs.repository.TeacherReportRepository.TeacherSubjectAggregation;
 import com.dagacs.security.AuthenticatedHodResolver;
 import com.dagacs.security.AuthenticatedTeacherResolver;
 import com.dagacs.service.HodAnalyticsService;
+import com.dagacs.service.TeacherStudentWiseReportService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -59,6 +61,7 @@ public class ReportExportService {
     private final HodAnalyticsService hodAnalyticsService;
     private final AuthenticatedTeacherResolver teacherResolver;
     private final TeacherReportRepository teacherReportRepository;
+    private final TeacherStudentWiseReportService studentWiseReportService;
     private final ExcelReportGenerator excelGenerator;
     private final PdfReportGenerator pdfGenerator;
 
@@ -67,6 +70,7 @@ public class ReportExportService {
                                HodAnalyticsService hodAnalyticsService,
                                AuthenticatedTeacherResolver teacherResolver,
                                TeacherReportRepository teacherReportRepository,
+                               TeacherStudentWiseReportService studentWiseReportService,
                                ExcelReportGenerator excelGenerator,
                                PdfReportGenerator pdfGenerator) {
         this.hodResolver = hodResolver;
@@ -74,6 +78,7 @@ public class ReportExportService {
         this.hodAnalyticsService = hodAnalyticsService;
         this.teacherResolver = teacherResolver;
         this.teacherReportRepository = teacherReportRepository;
+        this.studentWiseReportService = studentWiseReportService;
         this.excelGenerator = excelGenerator;
         this.pdfGenerator = pdfGenerator;
     }
@@ -93,6 +98,25 @@ public class ReportExportService {
     @Transactional(readOnly = true)
     public byte[] exportTeacher(ExportFormat format, LocalDate startDate, LocalDate endDate) {
         ExportData data = buildTeacherExportData(startDate, endDate);
+        return generate(data, format);
+    }
+
+    /**
+     * Additive student-wise matrix export. Unlike the subject-wise export this
+     * matrix describes one class, so the sectionId/batchId XOR selection is
+     * required to keep the generated table unambiguous.
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportTeacherStudentWise(ExportFormat format, LocalDate startDate, LocalDate endDate,
+                                           Long subjectId, Long sectionId, Long batchId) {
+        if (subjectId == null) {
+            throw new AuthException("Subject ID is required for the student-wise export", 400);
+        }
+        if ((sectionId == null) == (batchId == null)) {
+            throw new AuthException("Provide exactly one of sectionId or batchId.", 400);
+        }
+        ExportData data = buildTeacherStudentWiseExportData(startDate, endDate,
+                subjectId, sectionId, batchId);
         return generate(data, format);
     }
 
@@ -253,6 +277,63 @@ public class ReportExportService {
 
     private static String toCanonicalString(LocalDate date) {
         return date == null ? null : date.toString();
+    }
+
+    /**
+     * Additive builder mapping the normalized per-session matrix (sessionId-keyed
+     * cells) into the flat ExportData table. Column headers keep the
+     * (date, lecturePeriod) identity; no same-date collapsing.
+     */
+    private ExportData buildTeacherStudentWiseExportData(LocalDate startDate,
+                                                         LocalDate endDate, Long subjectId,
+                                                         Long sectionId, Long batchId) {
+        Teacher teacher = teacherResolver.resolve();
+        StudentWiseReportDTO report = studentWiseReportService.getStudentWiseReport(
+                startDate, endDate, subjectId, sectionId, batchId);
+        String subtitle = "Teacher: " + teacher.getFullName() + " | " + dateRangeText(startDate, endDate);
+
+        List<String> headers = new ArrayList<>(List.of(
+                "Enrollment Number", "Roll Number", "Student Name"));
+        for (int i = 0; i < report.getColumns().size(); i++) {
+            com.dagacs.dto.StudentWiseColumnDTO col = report.getColumns().get(i);
+            headers.add(col.getDate() + " | " + col.getLecturePeriod());
+        }
+        headers.addAll(List.of("Present", "Total Recorded", "Percentage (%)", "Batch Code"));
+
+        List<List<Object>> rows = new ArrayList<>();
+        for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
+            String[] cells = new String[report.getColumns().size()];
+            for (com.dagacs.dto.StudentWiseCellDTO cell : row.getCells()) {
+                int index = indexOfColumn(report, cell.getSessionId());
+                if (index >= 0) {
+                    cells[index] = cell.getStatus();
+                }
+            }
+            List<Object> excelRow = new ArrayList<>();
+            excelRow.add(row.getEnrollmentNumber());
+            excelRow.add(row.getRollNumber());
+            excelRow.add(row.getName());
+            excelRow.addAll(java.util.Arrays.asList(cells));
+            excelRow.add(row.getPresentCount());
+            excelRow.add(row.getTotalRecordedCount());
+            excelRow.add(row.getPercentage());
+            excelRow.add(report.getBatchCode());
+            rows.add(excelRow);
+        }
+
+        String title = report.getSectionName() != null
+                ? "Student-Wise Attendance - " + report.getSubjectName() + " - " + report.getSectionName()
+                : "Student-Wise Attendance - " + report.getSubjectName() + " - " + report.getBatchCode();
+        return new ExportData(title, subtitle, "Student-wise", headers, rows);
+    }
+
+    private static int indexOfColumn(StudentWiseReportDTO report, Long sessionId) {
+        for (int i = 0; i < report.getColumns().size(); i++) {
+            if (sessionId.equals(report.getColumns().get(i).getSessionId())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String dateRangeText(LocalDate startDate, LocalDate endDate) {

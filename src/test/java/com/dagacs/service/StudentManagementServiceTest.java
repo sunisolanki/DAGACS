@@ -1,6 +1,5 @@
 package com.dagacs.service;
 
-import com.dagacs.dto.StudentLoginRequestDTO;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
 import com.dagacs.entity.AcademicSession;
@@ -492,20 +491,36 @@ class StudentManagementServiceTest {
     }
 
     @Test
-    void provisionLogin_valid_provisionsStudentLogin() {
+    void provisionLogin_valid_provisionsTemporaryStudentLogin() {
         Student student = existingStudent();
         when(studentRepository.findById(1L)).thenReturn(Optional.of(student));
-        when(userRepository.findByEmail("student1@dagacs.local")).thenReturn(Optional.empty());
-
-        StudentLoginRequestDTO request = StudentLoginRequestDTO.builder()
-                .password("StuPass#1")
+        when(accountProvisioningService.generateSecurePassword()).thenReturn("TempPass#2026");
+        User provisioned = User.builder()
+                .id(7L)
+                .email("student1@dagacs.local")
+                .password("encoded")
+                .fullName("Rahul Kumar")
+                .phone("")
                 .status("ACTIVE")
+                .avatarUrl("")
+                .mustChangePassword(true)
+                .role(Role.builder().id(1L).name("STUDENT").build())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
-        StudentManagementDTO result = service.provisionLogin(1L, request);
+        when(userRepository.findByEmail("student1@dagacs.local"))
+                .thenReturn(Optional.empty(), Optional.of(provisioned));
 
-        verify(accountProvisioningService).provisionLogin(
-                "student1@dagacs.local", "Rahul Kumar", "StuPass#1", "STUDENT", "ACTIVE");
+        StudentManagementDTO result = service.provisionLogin(1L);
+
+        verify(accountProvisioningService).generateSecurePassword();
+        verify(accountProvisioningService).provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "TempPass#2026");
+        assertEquals("TempPass#2026", result.getTemporaryPassword());
         assertEquals("Rahul Kumar", result.getName());
+        assertTrue(result.isLoginLinked());
+        assertTrue(result.isMustChangePassword());
+        assertEquals("ACTIVE", result.getLoginStatus());
     }
 
     @Test
@@ -514,10 +529,11 @@ class StudentManagementServiceTest {
         student.setEmail(null);
         when(studentRepository.findById(1L)).thenReturn(Optional.of(student));
 
-        StudentLoginRequestDTO request = StudentLoginRequestDTO.builder().password("StuPass#1").build();
-        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L, request));
+        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L));
         assertEquals(400, ex.getStatus());
-        verify(accountProvisioningService, never()).provisionLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never())
+                .provisionTemporaryLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never()).generateSecurePassword();
     }
 
     @Test
@@ -527,10 +543,11 @@ class StudentManagementServiceTest {
         when(userRepository.findByEmail("student1@dagacs.local"))
                 .thenReturn(Optional.of(studentLoginFixture()));
 
-        StudentLoginRequestDTO request = StudentLoginRequestDTO.builder().password("StuPass#1").build();
-        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L, request));
+        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L));
         assertEquals(409, ex.getStatus());
-        verify(accountProvisioningService, never()).provisionLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never())
+                .provisionTemporaryLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never()).generateSecurePassword();
     }
 
     @Test
@@ -541,20 +558,20 @@ class StudentManagementServiceTest {
                 .thenReturn(Optional.of(User.builder()
                         .role(Role.builder().name("TEACHER").build()).build()));
 
-        StudentLoginRequestDTO request = StudentLoginRequestDTO.builder().password("StuPass#1").build();
-        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L, request));
+        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(1L));
         assertEquals(409, ex.getStatus());
-        verify(accountProvisioningService, never()).provisionLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never())
+                .provisionTemporaryLogin(any(), any(), any(), any(), any());
     }
 
     @Test
     void provisionLogin_unknownStudent_returns404() {
         when(studentRepository.findById(99L)).thenReturn(Optional.empty());
 
-        StudentLoginRequestDTO request = StudentLoginRequestDTO.builder().password("StuPass#1").build();
-        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(99L, request));
+        AuthException ex = assertThrows(AuthException.class, () -> service.provisionLogin(99L));
         assertEquals(404, ex.getStatus());
-        verify(accountProvisioningService, never()).provisionLogin(any(), any(), any(), any(), any());
+        verify(accountProvisioningService, never())
+                .provisionTemporaryLogin(any(), any(), any(), any(), any());
     }
 
     @Test

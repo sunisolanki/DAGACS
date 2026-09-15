@@ -159,15 +159,16 @@ public class AttendanceSessionService {
         }
 
         List<Student> students = session.getSectionEntity() != null
-                ? studentRepository.findBySectionIdAndStatusOrderByNameAsc(
+                ? studentRepository.findBySectionIdAndStatusOrderByEnrollmentNumberAsc(
                         session.getSectionEntity().getId(), "ACTIVE")
-                : studentRepository.findByBatchIdAndStatusOrderByNameAsc(
+                : studentRepository.findByBatchIdAndStatusOrderByEnrollmentNumberAsc(
                         session.getBatchEntity().getId(), "ACTIVE");
         return students.stream()
                 .map(s -> StudentDTO.builder()
                         .id(s.getId())
                         .rollNumber(s.getRollNumber())
                         .name(s.getName())
+                        .enrollmentNumber(s.getEnrollmentNumber())
                         .build())
                 .collect(Collectors.toList());
     }

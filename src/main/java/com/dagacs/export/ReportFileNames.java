@@ -20,6 +20,10 @@ public final class ReportFileNames {
         return "dagacs_teacher_subject_wise" + dateSuffix(startDate, endDate) + "." + extension;
     }
 
+    public static String forTeacherStudentWise(LocalDate startDate, LocalDate endDate, String extension) {
+        return "dagacs_teacher_student_wise" + dateSuffix(startDate, endDate) + "." + extension;
+    }
+
     private static String dateSuffix(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null) {
             return "_" + startDate + "_to_" + endDate;

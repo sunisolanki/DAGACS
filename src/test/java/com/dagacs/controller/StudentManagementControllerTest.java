@@ -298,7 +298,7 @@ class StudentManagementControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void provisionLogin_valid_returns201() throws Exception {
+    void provisionLogin_valid_returns201WithTemporaryPassword() throws Exception {
         StudentManagementDTO linked = StudentManagementDTO.builder()
                 .id(1L)
                 .rollNumber("2201CE001")
@@ -307,26 +307,30 @@ class StudentManagementControllerTest {
                 .status("ACTIVE")
                 .loginLinked(true)
                 .loginStatus("ACTIVE")
+                .mustChangePassword(true)
+                .temporaryPassword("TempPass#2026")
                 .build();
-        when(studentManagementService.provisionLogin(eq(1L), any())).thenReturn(linked);
+        when(studentManagementService.provisionLogin(1L)).thenReturn(linked);
 
-        mockMvc.perform(post("/api/admin/students/1/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\",\"status\":\"ACTIVE\"}"))
+        mockMvc.perform(post("/api/admin/students/1/login"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.loginLinked").value(true))
-                .andExpect(jsonPath("$.loginStatus").value("ACTIVE"));
-        verify(studentManagementService).provisionLogin(eq(1L), any());
+                .andExpect(jsonPath("$.loginStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andExpect(jsonPath("$.temporaryPassword").value("TempPass#2026"));
+        verify(studentManagementService).provisionLogin(1L);
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void provisionLogin_shortPassword_returns400() throws Exception {
-        mockMvc.perform(post("/api/admin/students/1/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"short\"}"))
-                .andExpect(status().isBadRequest());
-        verify(studentManagementService, never()).provisionLogin(any(), any());
+    void provisionLogin_studentWithoutEmail_returns400() throws Exception {
+        when(studentManagementService.provisionLogin(1L))
+                .thenThrow(new AuthException("The student has no email to link a login to", 400));
+
+        mockMvc.perform(post("/api/admin/students/1/login"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("The student has no email to link a login to"));
+        verify(studentManagementService).provisionLogin(1L);
     }
 
     @Test
@@ -379,9 +383,7 @@ class StudentManagementControllerTest {
     @Test
     @WithMockUser(roles = "STUDENT")
     void provisionLogin_nonAdmin_returns403() throws Exception {
-        mockMvc.perform(post("/api/admin/students/1/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"StuPass#1\"}"))
+        mockMvc.perform(post("/api/admin/students/1/login"))
                 .andExpect(status().isForbidden());
     }
 

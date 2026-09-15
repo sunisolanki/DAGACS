@@ -181,6 +181,41 @@ class AttendanceServiceTest {
     }
 
     @Test
+    void markAttendance_scheduledSession_transitionsToConducted() {
+        AttendanceSession scheduled = AttendanceSession.builder().id(10L)
+                .subjectEntity(subject).sectionEntity(section).teacherEntity(teacher)
+                .lecturePeriod("1st").date("2026-09-04").status("SCHEDULED").build();
+        when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(scheduled));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(studentRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(student1, student2));
+        when(attendanceRecordRepository.save(any(AttendanceRecord.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        List<AttendanceRecordDTO> result = attendanceService.markAttendance(validRequest());
+        assertEquals(2, result.size());
+        assertEquals("CONDUCTED", scheduled.getStatus());
+        verify(attendanceRecordRepository, times(2)).save(any(AttendanceRecord.class));
+    }
+
+    @Test
+    void markAttendance_conductedSession_keepsConducted() {
+        when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+        when(studentRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(student1, student2));
+        when(attendanceRecordRepository.save(any(AttendanceRecord.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        List<AttendanceRecordDTO> result = attendanceService.markAttendance(validRequest());
+        assertEquals(2, result.size());
+        assertEquals("CONDUCTED", session.getStatus());
+        verify(attendanceRecordRepository, times(2)).save(any(AttendanceRecord.class));
+    }
+
+    @Test
     void markAttendance_unassignedTeacher_returns403() {
         when(attendanceSessionRepository.findById(10L)).thenReturn(Optional.of(session));
         when(teacherResolver.resolve()).thenReturn(teacher);
@@ -284,16 +319,34 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void updateAttendance_unchangedStatus_returns400() {
+    void updateAttendance_unchangedStatus_isIdempotentNoop() {
         AttendanceRecord record = buildRecord("PRESENT");
         when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
         when(teacherResolver.resolve()).thenReturn(teacher);
         when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
 
         AttendanceUpdateRequestDTO dto = AttendanceUpdateRequestDTO.builder().newStatus("PRESENT").build();
-        AuthException ex = assertThrows(AuthException.class,
-                () -> attendanceService.updateAttendance(5L, dto));
-        assertEquals(400, ex.getStatus());
+        AttendanceRecordDTO result = attendanceService.updateAttendance(5L, dto);
+
+        assertEquals("PRESENT", result.getStatus());
+        assertTrue(result.getIsPresent());
+        verify(attendanceRecordRepository, never()).save(any());
+        verify(auditLogService, never()).recordChange(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void updateAttendance_unchangedAbsent_isIdempotentNoop() {
+        AttendanceRecord record = buildRecord("ABSENT");
+        when(attendanceRecordRepository.findById(5L)).thenReturn(Optional.of(record));
+        when(teacherResolver.resolve()).thenReturn(teacher);
+        when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(1L, 1L, 1L)).thenReturn(true);
+
+        AttendanceUpdateRequestDTO dto = AttendanceUpdateRequestDTO.builder().newStatus("ABSENT").build();
+        AttendanceRecordDTO result = attendanceService.updateAttendance(5L, dto);
+
+        assertEquals("ABSENT", result.getStatus());
+        assertFalse(result.getIsPresent());
+        verify(attendanceRecordRepository, never()).save(any());
         verify(auditLogService, never()).recordChange(any(), any(), any(), any(), any());
     }
 

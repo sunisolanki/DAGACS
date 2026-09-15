@@ -1,6 +1,5 @@
 package com.dagacs.service;
 
-import com.dagacs.dto.StudentLoginRequestDTO;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
 import com.dagacs.entity.Batch;
@@ -157,7 +156,7 @@ public class StudentManagementService {
     }
 
     @Transactional
-    public StudentManagementDTO provisionLogin(Long id, StudentLoginRequestDTO request) {
+    public StudentManagementDTO provisionLogin(Long id) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
         String email = student.getEmail();
@@ -170,9 +169,14 @@ public class StudentManagementService {
             throw new AuthException("Email is already in use by a login account", 409);
         }
 
-        accountProvisioningService.provisionLogin(email, student.getName(),
-                request.getPassword(), ROLE_STUDENT, request.getStatus());
-        return convertToDTO(student);
+        String temporaryPassword = accountProvisioningService.generateSecurePassword();
+        accountProvisioningService.provisionTemporaryLogin(
+                email.toLowerCase(), student.getName(), ROLE_STUDENT,
+                student.getStatus(), temporaryPassword);
+
+        StudentManagementDTO dto = convertToDTO(student);
+        dto.setTemporaryPassword(temporaryPassword);
+        return dto;
     }
 
     @Transactional

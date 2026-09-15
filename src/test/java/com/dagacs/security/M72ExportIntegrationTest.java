@@ -398,11 +398,14 @@ class M72ExportIntegrationTest {
     }
 
     @Test
-    void teacherExport_hodToken_returnsForbidden() throws Exception {
+    void teacherExport_hodToken_returnsAllowed() throws Exception {
+        Slice a = slice("A");
+        makeHod(a);
+        flush();
         String token = login(HOD_A_EMAIL, HOD_PASSWORD);
         mockMvc.perform(get("/api/teacher/attendance/report/export.xlsx")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
