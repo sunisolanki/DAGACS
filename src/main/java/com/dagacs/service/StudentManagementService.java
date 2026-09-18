@@ -2,12 +2,16 @@ package com.dagacs.service;
 
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
+import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Program;
+import com.dagacs.entity.Role;
 import com.dagacs.entity.Section;
 import com.dagacs.entity.Student;
+import com.dagacs.entity.Teacher;
 import com.dagacs.entity.User;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
@@ -20,40 +24,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-/**
- * Admin student master-management service (M5.2) plus student login
- * provisioning (M9.5.2).
- * <p>
- * Mirrors the existing master-data service pattern (AuthException with HTTP-like
- * statuses, constructor injection, transactional boundary around DTO mapping).
- * This service manages the {@code students} master-data table and, from M9.5.2,
- * the linked student login accounts. It uses only ACTIVE/INACTIVE statuses.
- * </p>
- * <p>
- * The profile and login lifecycles are deliberately separate (D4): profile
- * create/update/status methods never touch the login, and the login methods in
- * this service only act on {@link User} rows through
- * {@link AccountProvisioningService}. Logins are linked by email only (D1); any
- * email that is already owned by a teacher, a student, or a login account
- * returns 409, and an email cannot be changed while a login is linked, so
- * {@code User.email == Student.email} cannot drift.
- * </p>
- */
 @Service
 public class StudentManagementService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_INACTIVE = "INACTIVE";
     private static final String ROLE_STUDENT = "STUDENT";
+    private static final String TEMPORARY_PASSWORD = "Dagacs@123";
 
     private final StudentManagementRepository studentRepository;
     private final ProgramRepository programRepository;
+    private final AcademicSessionRepository academicSessionRepository;
     private final BatchRepository batchRepository;
     private final SectionRepository sectionRepository;
     private final TeacherRepository teacherRepository;
@@ -62,14 +48,16 @@ public class StudentManagementService {
 
     @Autowired
     public StudentManagementService(StudentManagementRepository studentRepository,
-                                    ProgramRepository programRepository,
-                                    BatchRepository batchRepository,
-                                    SectionRepository sectionRepository,
-                                    TeacherRepository teacherRepository,
-                                    UserRepository userRepository,
-                                    AccountProvisioningService accountProvisioningService) {
+                                     ProgramRepository programRepository,
+                                     AcademicSessionRepository academicSessionRepository,
+                                     BatchRepository batchRepository,
+                                     SectionRepository sectionRepository,
+                                     TeacherRepository teacherRepository,
+                                     UserRepository userRepository,
+                                     AccountProvisioningService accountProvisioningService) {
         this.studentRepository = studentRepository;
         this.programRepository = programRepository;
+        this.academicSessionRepository = academicSessionRepository;
         this.batchRepository = batchRepository;
         this.sectionRepository = sectionRepository;
         this.teacherRepository = teacherRepository;
@@ -79,313 +67,382 @@ public class StudentManagementService {
 
     @Transactional
     public StudentManagementDTO createStudent(StudentManagementRequestDTO request) {
-        Student student = applyFields(new Student(), request);
-        String status = normalizeStatus(request.getStatus());
-        student.setStatus(status != null ? status : STATUS_ACTIVE);
-        ensureUniqueOnCreate(request);
-        assertAcademicConsistency(student);
+        String rollNumber = trim(request.getRollNumber());
+        String name = trim(request.getName());
 
-        LocalDateTime now = LocalDateTime.now();
-        student.setCreatedAt(now);
-        student.setUpdatedAt(now);
-        student = studentRepository.save(student);
-
-        String temporaryPassword = null;
-        String email = student.getEmail();
-        if (email != null && !email.isBlank()) {
-            temporaryPassword = accountProvisioningService.generateSecurePassword();
-            accountProvisioningService.provisionTemporaryLogin(
-                    email.toLowerCase(), student.getName(), ROLE_STUDENT,
-                    student.getStatus(), temporaryPassword);
+        if (rollNumber == null || rollNumber.isBlank()) {
+            throw new AuthException("Roll number is required", 400);
+        }
+        if (name == null || name.isBlank()) {
+            throw new AuthException("Name is required", 400);
         }
 
-        StudentManagementDTO dto = convertToDTO(student);
-        dto.setTemporaryPassword(temporaryPassword);
+        if (studentRepository.existsByRollNumber(rollNumber)) {
+            throw new AuthException("Roll number already exists: " + rollNumber, 409);
+        }
+
+        String email = normalizeEmail(request.getEmail());
+        if (email != null && studentRepository.existsByEmail(email)) {
+            throw new AuthException("Email already exists: " + email, 409);
+        }
+        if (email != null && teacherRepository.findByEmail(email).isPresent()) {
+            throw new AuthException("Email already used by a teacher: " + email, 409);
+        }
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new AuthException("Email already used by a login account: " + email, 409);
+        }
+
+        String status = trim(request.getStatus());
+        if (status == null || status.isBlank()) {
+            status = STATUS_ACTIVE;
+        }
+        if (!STATUS_ACTIVE.equals(status) && !STATUS_INACTIVE.equals(status)) {
+            throw new AuthException("Status must be ACTIVE or INACTIVE", 400);
+        }
+
+        AcademicSession academicSession = resolveAcademicSession(request);
+        Program program = resolveProgram(request);
+
+        if (academicSession.getProgram() != null
+                && !academicSession.getProgram().getId().equals(program.getId())) {
+            throw new AuthException("Academic session program does not match student program", 400);
+        }
+
+        Batch batch = resolveBatch(request, academicSession);
+        Section section = resolveSection(request, batch);
+
+        if (batch != null && section != null
+                && !section.getBatch().getId().equals(batch.getId())) {
+            throw new AuthException("Section does not belong to the specified batch", 400);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Student student = Student.builder()
+                .rollNumber(rollNumber)
+                .email(email)
+                .name(name)
+                .gender(request.getGender())
+                .fatherName(request.getFatherName())
+                .motherName(request.getMotherName())
+                .photoUrl(request.getPhotoUrl())
+                .enrollmentNumber(request.getEnrollmentNumber())
+                .age(request.getAge())
+                .admissionDate(request.getAdmissionDate())
+                .status(status)
+                .academicSession(academicSession)
+                .program(program)
+                .batch(batch)
+                .section(section)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        student = studentRepository.save(student);
+
+        boolean loginLinked = false;
+        if (email != null && !email.isBlank()) {
+            User provisioned = accountProvisioningService.provisionTemporaryLogin(
+                    email, name, ROLE_STUDENT, status, TEMPORARY_PASSWORD);
+            student.setEmail(provisioned.getEmail());
+            loginLinked = true;
+        }
+
+        StudentManagementDTO dto = convertToDTO(student, loginLinked);
+        if (loginLinked) {
+            dto.setTemporaryPassword(TEMPORARY_PASSWORD);
+        }
         return dto;
     }
 
     @Transactional(readOnly = true)
+    public void assertValidForCreate(StudentManagementRequestDTO request) {
+        String rollNumber = trim(request.getRollNumber());
+        String name = trim(request.getName());
+
+        if (rollNumber == null || rollNumber.isBlank()) {
+            throw new AuthException("Roll number is required", 400);
+        }
+        if (name == null || name.isBlank()) {
+            throw new AuthException("Name is required", 400);
+        }
+
+        String email = normalizeEmail(request.getEmail());
+
+        if (studentRepository.existsByRollNumber(rollNumber)) {
+            throw new AuthException("Roll number already exists: " + rollNumber, 409);
+        }
+
+        if (email != null && studentRepository.existsByEmail(email)) {
+            throw new AuthException("Email already exists: " + email, 409);
+        }
+        if (email != null && teacherRepository.findByEmail(email).isPresent()) {
+            throw new AuthException("Email already used by a teacher: " + email, 409);
+        }
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new AuthException("Email already used by a login account: " + email, 409);
+        }
+
+        String status = trim(request.getStatus());
+        if (status != null && !status.isBlank()
+                && !STATUS_ACTIVE.equals(status) && !STATUS_INACTIVE.equals(status)) {
+            throw new AuthException("Status must be ACTIVE or INACTIVE", 400);
+        }
+
+        AcademicSession academicSession = resolveAcademicSession(request);
+        Program program = resolveProgram(request);
+
+        if (academicSession.getProgram() != null
+                && !academicSession.getProgram().getId().equals(program.getId())) {
+            throw new AuthException("Academic session program does not match student program", 400);
+        }
+
+        Batch batch = resolveBatch(request, academicSession);
+        Section section = resolveSection(request, batch);
+
+        if (batch != null && section != null
+                && !section.getBatch().getId().equals(batch.getId())) {
+            throw new AuthException("Section does not belong to the specified batch", 400);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<StudentManagementDTO> getAllStudents() {
-        return studentRepository.findAllByOrderByNameAsc().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<Student> students = studentRepository.findAllByOrderByNameAsc();
+        return students.stream().map(s -> convertToDTO(s, false)).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public StudentManagementDTO getStudentById(Long id) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
-        return convertToDTO(student);
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
+        boolean loginLinked = student.getEmail() != null
+                && userRepository.findByEmail(student.getEmail()).isPresent();
+        return convertToDTO(student, loginLinked);
     }
 
     @Transactional
     public StudentManagementDTO updateStudent(Long id, StudentManagementRequestDTO request) {
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
+        Student existing = studentRepository.findById(id)
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
 
-        String originalRollNumber = student.getRollNumber();
-        String originalEmail = student.getEmail();
-
-        applyFields(student, request);
-        String requestedStatus = normalizeStatus(request.getStatus());
-        if (requestedStatus != null) {
-            student.setStatus(requestedStatus);
+        String rollNumber = trim(request.getRollNumber());
+        if (rollNumber == null || rollNumber.isBlank()) {
+            throw new AuthException("Roll number is required", 400);
         }
-        ensureUniqueOnUpdate(student, request, originalRollNumber, originalEmail);
-        assertAcademicConsistency(student);
 
-        student.setUpdatedAt(LocalDateTime.now());
-        student = studentRepository.save(student);
-        return convertToDTO(student);
+        if (!rollNumber.equals(existing.getRollNumber())
+                && studentRepository.existsByRollNumber(rollNumber)) {
+            throw new AuthException("Roll number already exists: " + rollNumber, 409);
+        }
+
+        String email = normalizeEmail(request.getEmail());
+        if (existing.getEmail() != null
+                && userRepository.findByEmail(existing.getEmail()).isPresent()
+                && !emailMatchesExisting(email, existing.getEmail())) {
+            throw new AuthException("Email cannot be changed while a login account is linked", 409);
+        }
+        if (email != null && !email.equals(existing.getEmail())
+                && studentRepository.existsByEmail(email)) {
+            throw new AuthException("Email already exists: " + email, 409);
+        }
+
+        String status = trim(request.getStatus());
+        if (status != null && !status.isBlank()
+                && !STATUS_ACTIVE.equals(status) && !STATUS_INACTIVE.equals(status)) {
+            throw new AuthException("Status must be ACTIVE or INACTIVE", 400);
+        }
+
+        AcademicSession academicSession = resolveAcademicSession(request);
+        Program program = resolveProgram(request);
+
+        if (academicSession.getProgram() != null
+                && !academicSession.getProgram().getId().equals(program.getId())) {
+            throw new AuthException("Academic session program does not match student program", 400);
+        }
+
+        Batch batch = resolveBatch(request, academicSession);
+        Section section = resolveSection(request, batch);
+
+        if (batch != null && section != null
+                && !section.getBatch().getId().equals(batch.getId())) {
+            throw new AuthException("Section does not belong to the specified batch", 400);
+        }
+
+        existing.setRollNumber(rollNumber);
+        existing.setEmail(email);
+        existing.setName(trim(request.getName()));
+        existing.setGender(request.getGender());
+        existing.setFatherName(request.getFatherName());
+        existing.setMotherName(request.getMotherName());
+        existing.setPhotoUrl(request.getPhotoUrl());
+        existing.setEnrollmentNumber(request.getEnrollmentNumber());
+        existing.setAge(request.getAge());
+        existing.setAdmissionDate(request.getAdmissionDate());
+        existing.setStatus(status != null && !status.isBlank() ? status : STATUS_ACTIVE);
+        existing.setAcademicSession(academicSession);
+        existing.setProgram(program);
+        existing.setBatch(batch);
+        existing.setSection(section);
+        existing.setUpdatedAt(LocalDateTime.now());
+        studentRepository.save(existing);
+
+        return convertToDTO(existing, existing.getEmail() != null
+                && userRepository.findByEmail(existing.getEmail()).isPresent());
     }
 
     @Transactional
-    public StudentManagementDTO setStudentStatus(Long id, String rawStatus) {
-        String status = normalizeStatus(rawStatus);
-        if (status == null) {
-            throw new AuthException("Status is required", 400);
-        }
-
+    public StudentManagementDTO setStudentStatus(Long id, String status) {
+        String normalized = AccountProvisioningService.normalizeStatus(status);
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
-
-        student.setStatus(status);
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
+        student.setStatus(normalized);
         student.setUpdatedAt(LocalDateTime.now());
-        student = studentRepository.save(student);
-        return convertToDTO(student);
+        studentRepository.save(student);
+        return convertToDTO(student, false);
     }
 
     @Transactional
     public StudentManagementDTO provisionLogin(Long id) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
+
         String email = student.getEmail();
-        if (email == null || email.trim().isEmpty()) {
-            throw new AuthException("The student has no email to link a login to", 400);
+        if (email == null || email.isBlank()) {
+            throw new AuthException("Student has no email linked", 400);
         }
 
-        Optional<User> existing = userRepository.findByEmail(email.toLowerCase());
-        if (existing.isPresent()) {
-            throw new AuthException("Email is already in use by a login account", 409);
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new AuthException("A login account already exists for this student", 409);
         }
 
-        String temporaryPassword = accountProvisioningService.generateSecurePassword();
-        accountProvisioningService.provisionTemporaryLogin(
-                email.toLowerCase(), student.getName(), ROLE_STUDENT,
-                student.getStatus(), temporaryPassword);
+        User provisioned = accountProvisioningService.provisionTemporaryLogin(
+                email, student.getName(), ROLE_STUDENT,
+                student.getStatus() != null ? student.getStatus() : STATUS_ACTIVE,
+                TEMPORARY_PASSWORD);
+        student.setEmail(provisioned.getEmail());
 
-        StudentManagementDTO dto = convertToDTO(student);
-        dto.setTemporaryPassword(temporaryPassword);
+        StudentManagementDTO dto = convertToDTO(student, true);
+        dto.setTemporaryPassword(TEMPORARY_PASSWORD);
         return dto;
     }
 
     @Transactional
-    public StudentManagementDTO setLoginStatus(Long id, String rawStatus) {
+    public StudentManagementDTO setLoginStatus(Long id, String status) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
-        User user = linkedUserOrThrow(student);
-        accountProvisioningService.changeStatus(user, rawStatus);
-        return convertToDTO(student);
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
+        String email = student.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new AuthException("No linked login account", 404);
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthException("No linked login account", 404));
+        accountProvisioningService.changeStatus(user, status);
+        return convertToDTO(student, true);
     }
 
     @Transactional
     public StudentManagementDTO setLoginPassword(Long id, String rawPassword) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new AuthException("Student not found with ID: " + id, 404));
-        User user = linkedUserOrThrow(student);
+                .orElseThrow(() -> new AuthException("Student not found with id: " + id, 404));
+        String email = student.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new AuthException("No linked login account", 404);
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AuthException("No linked login account", 404));
         accountProvisioningService.resetPassword(user, rawPassword);
-        return convertToDTO(student);
+        return convertToDTO(student, true);
     }
 
-    /**
-     * M9.10 import-only pre-persist validation.
-     * <p>
-     * Runs the exact same normalization, reference-resolution, uniqueness and
-     * academic-consistency checks {@link #createStudent(StudentManagementRequestDTO)}
-     * performs, <b>without persisting anything</b>. Used by
-     * {@link com.dagacs.service.StudentImportService} so a bulk batch can be
-     * fully validated before any row is saved (all-or-nothing import). This is
-     * intentionally the single validation path - bulk import must never diverge
-     * from single-student creation semantics.
-     * </p>
-     */
-    public void assertValidForCreate(StudentManagementRequestDTO request) {
-        Student student = applyFields(new Student(), request);
-        normalizeStatus(request.getStatus());
-        ensureUniqueOnCreate(request);
-        assertAcademicConsistency(student);
-    }
+    private AcademicSession resolveAcademicSession(StudentManagementRequestDTO request) {
+        AcademicSession session = null;
 
-    private Student applyFields(Student student, StudentManagementRequestDTO request) {
-        String rollNumber = trimToNull(request.getRollNumber());
-        if (rollNumber == null) {
-            throw new AuthException("Roll number is required", 400);
-        }
-        String name = trimToNull(request.getName());
-        if (name == null) {
-            throw new AuthException("Student name is required", 400);
+        if (request.getAcademicSessionId() != null) {
+            session = academicSessionRepository.findById(request.getAcademicSessionId())
+                    .orElseThrow(() -> new AuthException("Academic session not found with id: " + request.getAcademicSessionId(), 404));
         }
 
-        student.setRollNumber(rollNumber);
-        student.setName(name);
-        student.setEmail(trimToNull(request.getEmail()));
-        student.setGender(defaultValue(request.getGender()));
-        student.setFatherName(defaultValue(request.getFatherName()));
-        student.setMotherName(defaultValue(request.getMotherName()));
-        student.setPhotoUrl(defaultValue(request.getPhotoUrl()));
-        student.setEnrollmentNumber(defaultValue(request.getEnrollmentNumber()));
-        student.setAge(request.getAge() != null ? request.getAge() : 0);
-        student.setAdmissionDate(defaultValue(request.getAdmissionDate()));
-        student.setProgram(resolveProgram(request.getProgramId()));
-        student.setBatch(resolveBatch(request.getBatchId()));
-        student.setSection(resolveOptionalSection(request.getSectionId(), student.getBatch()));
-        return student;
+        if (session == null && request.getAcademicSession() != null && !request.getAcademicSession().isBlank()) {
+            session = academicSessionRepository.findByName(request.getAcademicSession())
+                    .orElseThrow(() -> new AuthException("Academic session not found: " + request.getAcademicSession(), 404));
+        }
+
+        if (session == null) {
+            throw new AuthException("Academic session is required", 400);
+        }
+
+        return session;
     }
 
-    /**
-     * Approved M5.2 optional fields are nullable at the API boundary, but the
-     * frozen {@link Student} entity maps them as NOT NULL. Mirroring the existing
-     * {@code photoUrl} default already in this class (and the project's neutral
-     * {@code ""} defaults for optional {@code User} columns), blank/null values
-     * collapse to {@code ""} so a minimal M5.2 payload persists cleanly.
-     */
-    private String defaultValue(String value) {
-        String trimmed = trimToNull(value);
-        return trimmed != null ? trimmed : "";
-    }
+    private Program resolveProgram(StudentManagementRequestDTO request) {
+        Program program = null;
 
-    private Program resolveProgram(Long programId) {
-        if (programId == null) {
+        if (request.getProgramId() != null) {
+            program = programRepository.findById(request.getProgramId())
+                    .orElseThrow(() -> new AuthException("Program not found with id: " + request.getProgramId(), 404));
+        }
+
+        if (program == null && request.getProgram() != null && !request.getProgram().isBlank()) {
+            program = programRepository.findByName(request.getProgram())
+                    .orElseThrow(() -> new AuthException("Program not found: " + request.getProgram(), 404));
+        }
+
+        if (program == null) {
             throw new AuthException("Program is required", 400);
         }
-        return programRepository.findById(programId)
-                .orElseThrow(() -> new AuthException("Program not found with ID: " + programId, 404));
+
+        return program;
     }
 
-    private Batch resolveBatch(Long batchId) {
-        if (batchId == null) {
-            throw new AuthException("Batch is required", 400);
-        }
-        return batchRepository.findById(batchId)
-                .orElseThrow(() -> new AuthException("Batch not found with ID: " + batchId, 404));
-    }
-
-    private Section resolveOptionalSection(Long sectionId, Batch batch) {
-        if (sectionId == null) {
-            if (!sectionRepository.findByBatch(batch).isEmpty()) {
-                throw new AuthException("Section is required for this batch", 400);
+    private Batch resolveBatch(StudentManagementRequestDTO request, AcademicSession academicSession) {
+        if (request.getBatchId() != null) {
+            Batch batch = batchRepository.findById(request.getBatchId())
+                    .orElseThrow(() -> new AuthException("Batch not found with id: " + request.getBatchId(), 404));
+            if (!batch.getAcademicSession().getId().equals(academicSession.getId())) {
+                throw new AuthException("Batch does not belong to the specified academic session", 400);
             }
-            return null;
+            return batch;
         }
-        return sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new AuthException("Section not found with ID: " + sectionId, 404));
+
+        if (request.getBatch() != null && !request.getBatch().isBlank()) {
+            AcademicSession session = academicSession;
+            Program program = resolveProgram(request);
+            Batch matching = batchRepository.findByAcademicSession(session).stream()
+                    .filter(b -> b.getName().equals(request.getBatch())
+                            && b.getAcademicSession().getId().equals(session.getId())
+                            && b.getAcademicSession().getProgram().getId().equals(program.getId()))
+                    .findFirst()
+                    .orElse(null);
+            if (matching != null) {
+                return matching;
+            }
+        }
+
+        return null;
     }
 
-    private void assertAcademicConsistency(Student student) {
-        Long programId = student.getProgram().getId();
-        Long batchProgramId = student.getBatch().getAcademicSession().getProgram().getId();
-        if (!programId.equals(batchProgramId)) {
-            throw new AuthException(
-                    "Student program does not match batch academic session program", 400);
+    private Section resolveSection(StudentManagementRequestDTO request, Batch batch) {
+        if (request.getSectionId() != null) {
+            Section section = sectionRepository.findById(request.getSectionId())
+                    .orElseThrow(() -> new AuthException("Section not found with id: " + request.getSectionId(), 404));
+            if (batch != null && !section.getBatch().getId().equals(batch.getId())) {
+                throw new AuthException("Section does not belong to the specified batch", 400);
+            }
+            return section;
         }
-        if (student.getSection() != null
-                && !student.getSection().getBatch().getId().equals(student.getBatch().getId())) {
-            throw new AuthException("Section batch does not match selected batch", 400);
+
+        if (request.getSection() != null && !request.getSection().isBlank() && batch != null) {
+            Section matching = sectionRepository.findByNameAndBatch(request.getSection(), batch)
+                    .orElse(null);
+            if (matching != null) {
+                return matching;
+            }
         }
+
+        return null;
     }
 
-    private void ensureUniqueOnCreate(StudentManagementRequestDTO request) {
-        String rollNumber = trimToNull(request.getRollNumber());
-        if (studentRepository.existsByRollNumber(rollNumber)) {
-            throw new AuthException("Roll number already exists: " + rollNumber, 409);
-        }
-        String email = trimToNull(request.getEmail());
-        if (email != null) {
-            ensureEmailAvailableForStudent(email);
-        }
-    }
-
-    private void ensureUniqueOnUpdate(Student student, StudentManagementRequestDTO request,
-                                      String originalRollNumber, String originalEmail) {
-        String rollNumber = trimToNull(request.getRollNumber());
-        if (!rollNumber.equals(originalRollNumber)
-                && studentRepository.existsByRollNumber(rollNumber)) {
-            throw new AuthException("Roll number already exists: " + rollNumber, 409);
-        }
-        String email = trimToNull(request.getEmail());
-        String normalizedOriginalEmail = trimToNull(originalEmail);
-        if (email != null && !email.equalsIgnoreCase(normalizedOriginalEmail)) {
-            assertEmailNotLinked(originalEmail);
-            ensureEmailAvailableForStudent(email);
-        }
-    }
-
-    /**
-     * D1 ownership check: a student email must not collide with a student, a
-     * teacher profile, or an existing login account anywhere in the system.
-     */
-    private void ensureEmailAvailableForStudent(String email) {
-        if (studentRepository.existsByEmail(email)) {
-            throw new AuthException("Email already exists: " + email, 409);
-        }
-        if (teacherRepository.findByEmail(email).isPresent()) {
-            throw new AuthException("Email is already registered to a teacher profile", 409);
-        }
-        if (userRepository.existsByEmail(email)) {
-            throw new AuthException("Email is already in use by a login account", 409);
-        }
-    }
-
-    /**
-     * Changing a student email while a login is linked would silently break the
-     * D1 linkage, so it is forbidden until the login is removed (which the admin
-     * surface does not offer — login deactivation is the supported lifecycle).
-     */
-    private void assertEmailNotLinked(String originalEmail) {
-        if (originalEmail == null || originalEmail.isBlank()) {
-            return;
-        }
-        boolean linked = userRepository.findByEmail(originalEmail.toLowerCase()).isPresent();
-        if (linked) {
-            throw new AuthException("Cannot change the email while a login account is linked", 409);
-        }
-    }
-
-    private User linkedUserOrThrow(Student student) {
-        String email = student.getEmail();
-        if (email == null || email.trim().isEmpty()) {
-            throw new AuthException("The student has no email to link a login to", 400);
-        }
-        return userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new AuthException(
-                        "No login account is linked to this student", 404));
-    }
-
-    private String normalizeStatus(String rawStatus) {
-        if (rawStatus == null || rawStatus.trim().isEmpty()) {
-            return null;
-        }
-        String status = rawStatus.trim().toUpperCase();
-        if (!STATUS_ACTIVE.equals(status) && !STATUS_INACTIVE.equals(status)) {
-            throw new AuthException("Status must be ACTIVE or INACTIVE", 400);
-        }
-        return status;
-    }
-
-    private String trimToNull(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return null;
-        }
-        return value.trim();
-    }
-
-    private StudentManagementDTO convertToDTO(Student student) {
-        User user = null;
-        String email = student.getEmail();
-        if (email != null && !email.isBlank()) {
-            user = userRepository.findByEmail(email.toLowerCase()).orElse(null);
-        }
-        return StudentManagementDTO.builder()
+    private StudentManagementDTO convertToDTO(Student student, boolean loginLinked) {
+        StudentManagementDTO dto = StudentManagementDTO.builder()
                 .id(student.getId())
                 .rollNumber(student.getRollNumber())
                 .email(student.getEmail())
@@ -398,17 +455,47 @@ public class StudentManagementService {
                 .age(student.getAge())
                 .admissionDate(student.getAdmissionDate())
                 .status(student.getStatus())
-                .programId(student.getProgram().getId())
-                .programName(student.getProgram().getName())
-                .batchId(student.getBatch().getId())
-                .batchName(student.getBatch().getName())
+                .programId(student.getProgram() != null ? student.getProgram().getId() : null)
+                .programName(student.getProgram() != null ? student.getProgram().getName() : null)
+                .batchId(student.getBatch() != null ? student.getBatch().getId() : null)
+                .batchName(student.getBatch() != null ? student.getBatch().getName() : null)
                 .sectionId(student.getSection() != null ? student.getSection().getId() : null)
                 .sectionName(student.getSection() != null ? student.getSection().getName() : null)
-                .loginLinked(user != null)
-                .loginStatus(user != null ? user.getStatus() : null)
-                .mustChangePassword(user != null && user.isMustChangePassword())
+                .academicSessionId(student.getAcademicSession() != null ? student.getAcademicSession().getId() : null)
+                .academicSessionName(student.getAcademicSession() != null ? student.getAcademicSession().getName() : null)
+                .loginLinked(loginLinked)
+                .mustChangePassword(loginLinked && student.getEmail() != null
+                        && userRepository.findByEmail(student.getEmail()).map(User::isMustChangePassword).orElse(false))
                 .createdAt(student.getCreatedAt())
                 .updatedAt(student.getUpdatedAt())
                 .build();
+
+        if (loginLinked && student.getEmail() != null) {
+            User user = userRepository.findByEmail(student.getEmail()).orElse(null);
+            if (user != null) {
+                dto.setLoginStatus(user.getStatus());
+                dto.setMustChangePassword(user.isMustChangePassword());
+            }
+        }
+
+        return dto;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return email.trim().toLowerCase();
+    }
+
+    private boolean emailMatchesExisting(String email, String existingEmail) {
+        return email != null && email.equals(existingEmail);
+    }
+
+    private String trim(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

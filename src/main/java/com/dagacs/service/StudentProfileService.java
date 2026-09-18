@@ -38,9 +38,10 @@ public class StudentProfileService {
                 .age(student.getAge())
                 .admissionDate(student.getAdmissionDate())
                 .status(student.getStatus())
-                .batchName(student.getBatch().getName())
+                .batchName(student.getBatch() != null ? student.getBatch().getName() : null)
                 .programName(student.getProgram().getName())
                 .sectionName(student.getSection() != null ? student.getSection().getName() : null)
+                .academicSessionName(student.getAcademicSession() != null ? student.getAcademicSession().getName() : null)
                 .build();
     }
 }

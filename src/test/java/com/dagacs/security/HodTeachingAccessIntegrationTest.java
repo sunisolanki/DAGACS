@@ -150,7 +150,7 @@ class HodTeachingAccessIntegrationTest {
                 .enrollmentNumber("ENR-" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email(null)
-                .batch(s.batch).section(s.section).program(s.program)
+                .academicSession(s.session).batch(s.batch).section(s.section).program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
     }
 
@@ -170,7 +170,7 @@ class HodTeachingAccessIntegrationTest {
                 .enrollmentNumber("ENR-" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email(null)
-                .batch(batch).section(null).program(s.program)
+                .academicSession(s.session).batch(batch).section(null).program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
     }
 

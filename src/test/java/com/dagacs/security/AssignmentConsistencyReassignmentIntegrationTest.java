@@ -261,9 +261,11 @@ class AssignmentConsistencyReassignmentIntegrationTest {
                 + "\"motherName\":\"Mother\","
                 + "\"photoUrl\":\"\","
                 + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
+                + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
                 + "\"age\":20,"
                 + "\"admissionDate\":\"2026-01-01\","
                 + "\"status\":\"ACTIVE\","
+                + "\"academicSessionId\":" + section.getBatch().getAcademicSession().getId() + ","
                 + "\"programId\":" + section.getBatch().getAcademicSession().getProgram().getId() + ","
                 + "\"batchId\":" + section.getBatch().getId() + ","
                 + "\"sectionId\":" + section.getId()

@@ -27,4 +27,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     long countByBatchId(Long batchId);
 
     long countBySectionId(Long sectionId);
+
+    List<Student> findByAcademicSessionId(Long academicSessionId);
+
+    long countByAcademicSessionId(Long academicSessionId);
+
+    boolean existsByAcademicSessionId(Long academicSessionId);
+
+    boolean existsByAcademicSessionIdAndRollNumber(Long academicSessionId, String rollNumber);
 }

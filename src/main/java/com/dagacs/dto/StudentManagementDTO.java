@@ -36,6 +36,8 @@ public class StudentManagementDTO {
     private String batchName;
     private Long sectionId;
     private String sectionName;
+    private Long academicSessionId;
+    private String academicSessionName;
 
     private boolean loginLinked;
     private String loginStatus;

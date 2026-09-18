@@ -5,13 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Read-only DTO for the authenticated student's own academic profile (M5.1).
- * <p>
- * Returned only for the student resolved from the JWT security context; no
- * studentId is ever accepted from the client.
- * </p>
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -32,4 +25,5 @@ public class StudentProfileDTO {
     private String batchName;
     private String programName;
     private String sectionName;
+    private String academicSessionName;
 }

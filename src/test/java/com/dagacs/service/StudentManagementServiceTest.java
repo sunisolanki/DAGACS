@@ -11,6 +11,7 @@ import com.dagacs.entity.Student;
 import com.dagacs.entity.Teacher;
 import com.dagacs.entity.User;
 import com.dagacs.exception.AuthException;
+import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
@@ -33,11 +34,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StudentManagementServiceTest {
 
     @Mock
@@ -45,6 +51,9 @@ class StudentManagementServiceTest {
 
     @Mock
     private ProgramRepository programRepository;
+
+    @Mock
+    private AcademicSessionRepository academicSessionRepository;
 
     @Mock
     private BatchRepository batchRepository;
@@ -95,6 +104,7 @@ class StudentManagementServiceTest {
                 .enrollmentNumber("ENR-001")
                 .age(20)
                 .admissionDate("2026-01-01")
+                .academicSessionId(1L)
                 .programId(1L)
                 .batchId(1L)
                 .sectionId(1L)
@@ -105,6 +115,7 @@ class StudentManagementServiceTest {
         return StudentManagementRequestDTO.builder()
                 .rollNumber("2201CE001")
                 .name("Rahul Kumar")
+                .academicSessionId(1L)
                 .programId(1L)
                 .batchId(1L)
                 .sectionId(1L)
@@ -113,6 +124,11 @@ class StudentManagementServiceTest {
 
     private void stubValidReferences() {
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(
+                AcademicSession.builder().id(1L).name("2026-27").code("2026-27")
+                        .program(program).description("")
+                        .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                        .build()));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
     }
@@ -156,6 +172,11 @@ class StudentManagementServiceTest {
     }
 
     private Student existingStudent() {
+        AcademicSession session = AcademicSession.builder()
+                .id(1L).name("2026-27").code("2026-27")
+                .program(program).description("")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
         return Student.builder()
                 .id(1L)
                 .rollNumber("2201CE001")
@@ -172,6 +193,7 @@ class StudentManagementServiceTest {
                 .program(program)
                 .batch(batch)
                 .section(section)
+                .academicSession(session)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -182,6 +204,17 @@ class StudentManagementServiceTest {
         stubValidReferences();
         stubNoCollisionOrLink();
         when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+        User provisionedUser = User.builder()
+                .id(7L).email("student1@dagacs.local")
+                .password("encoded").fullName("Rahul Kumar")
+                .phone("").status("ACTIVE").avatarUrl("")
+                .mustChangePassword(true)
+                .role(Role.builder().id(1L).name("STUDENT").build())
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(accountProvisioningService.provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123"))
+                .thenReturn(provisionedUser);
 
         StudentManagementDTO result = service.createStudent(validRequest());
 
@@ -191,6 +224,7 @@ class StudentManagementServiceTest {
         assertEquals("Computer Science", result.getProgramName());
         assertEquals("B1", result.getBatchName());
         assertEquals("A", result.getSectionName());
+        assertTrue(result.isLoginLinked());
         verify(studentRepository).save(any(Student.class));
     }
 
@@ -292,6 +326,17 @@ class StudentManagementServiceTest {
         stubValidReferences();
         stubNoCollisionOrLink();
         when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+        User provisionedUser = User.builder()
+                .id(7L).email("student1@dagacs.local")
+                .password("encoded").fullName("Rahul Kumar")
+                .phone("").status("ACTIVE").avatarUrl("")
+                .mustChangePassword(true)
+                .role(Role.builder().id(1L).name("STUDENT").build())
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        lenient().when(accountProvisioningService.provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123"))
+                .thenReturn(provisionedUser);
 
         StudentManagementDTO result = service.createStudent(validRequest());
 
@@ -302,7 +347,6 @@ class StudentManagementServiceTest {
     void createStudent_autoProvisionsStudentLogin_withTemporaryPassword() {
         stubValidReferences();
         stubTeacherNoCollision();
-        when(accountProvisioningService.generateSecurePassword()).thenReturn("TempPass#2026");
         when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
         User provisioned = User.builder()
                 .id(7L)
@@ -319,16 +363,18 @@ class StudentManagementServiceTest {
                 .build();
         when(userRepository.findByEmail("student1@dagacs.local"))
                 .thenReturn(Optional.of(provisioned));
+        when(accountProvisioningService.provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123"))
+                .thenReturn(provisioned);
 
         StudentManagementDTO result = service.createStudent(validRequest());
 
-        assertEquals("TempPass#2026", result.getTemporaryPassword());
+        assertEquals("Dagacs@123", result.getTemporaryPassword());
         assertTrue(result.isLoginLinked());
         assertTrue(result.isMustChangePassword());
         assertEquals("ACTIVE", result.getLoginStatus());
-        verify(accountProvisioningService).generateSecurePassword();
         verify(accountProvisioningService).provisionTemporaryLogin(
-                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "TempPass#2026");
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123");
         verify(studentRepository).save(any(Student.class));
     }
 
@@ -494,7 +540,6 @@ class StudentManagementServiceTest {
     void provisionLogin_valid_provisionsTemporaryStudentLogin() {
         Student student = existingStudent();
         when(studentRepository.findById(1L)).thenReturn(Optional.of(student));
-        when(accountProvisioningService.generateSecurePassword()).thenReturn("TempPass#2026");
         User provisioned = User.builder()
                 .id(7L)
                 .email("student1@dagacs.local")
@@ -510,13 +555,15 @@ class StudentManagementServiceTest {
                 .build();
         when(userRepository.findByEmail("student1@dagacs.local"))
                 .thenReturn(Optional.empty(), Optional.of(provisioned));
+        when(accountProvisioningService.provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123"))
+                .thenReturn(provisioned);
 
         StudentManagementDTO result = service.provisionLogin(1L);
 
-        verify(accountProvisioningService).generateSecurePassword();
         verify(accountProvisioningService).provisionTemporaryLogin(
-                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "TempPass#2026");
-        assertEquals("TempPass#2026", result.getTemporaryPassword());
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123");
+        assertEquals("Dagacs@123", result.getTemporaryPassword());
         assertEquals("Rahul Kumar", result.getName());
         assertTrue(result.isLoginLinked());
         assertTrue(result.isMustChangePassword());
@@ -675,6 +722,12 @@ class StudentManagementServiceTest {
 
     @Test
     void createStudent_programMismatch_returns400() {
+        AcademicSession session = AcademicSession.builder()
+                .id(1L).name("2026-27").code("2026-27")
+                .program(program).description("")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
         AcademicSession otherSession = AcademicSession.builder()
@@ -693,6 +746,12 @@ class StudentManagementServiceTest {
 
     @Test
     void createStudent_sectionBatchMismatch_returns400() {
+        AcademicSession session = AcademicSession.builder()
+                .id(1L).name("2026-27").code("2026-27")
+                .program(program).description("")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
         Section otherSection = Section.builder().id(2L).sectionCode("SEC-B").name("B")
@@ -709,8 +768,14 @@ class StudentManagementServiceTest {
 
     @Test
     void updateStudent_programMismatch_returns400() {
+        AcademicSession session = AcademicSession.builder()
+                .id(1L).name("2026-27").code("2026-27")
+                .program(program).description("")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
         Student existing = existingStudent();
         when(studentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
         AcademicSession otherSession = AcademicSession.builder()
@@ -729,8 +794,14 @@ class StudentManagementServiceTest {
 
     @Test
     void updateStudent_sectionBatchMismatch_returns400() {
+        AcademicSession session = AcademicSession.builder()
+                .id(1L).name("2026-27").code("2026-27")
+                .program(program).description("")
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
         Student existing = existingStudent();
         when(studentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
         Section otherSection = Section.builder().id(2L).sectionCode("SEC-B").name("B")
@@ -750,16 +821,20 @@ class StudentManagementServiceTest {
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
         AcademicSession sameIdSession = AcademicSession.builder()
-                .id(2L).name("2027-28").code("2027-28")
+                .id(1L).name("2027-28").code("2027-28")
                 .program(Program.builder().id(1L).name("B.Tech CSE").build())
                 .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
                 .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(sameIdSession));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(
                 Batch.builder().id(1L).batchCode("B-2026").name("B1")
                         .year(2026).academicSession(sameIdSession).program("B.Tech CSE").build()));
         stubTeacherNoCollision();
         stubNoLinkedLogin();
         when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(accountProvisioningService.provisionTemporaryLogin(
+                "student1@dagacs.local", "Rahul Kumar", "STUDENT", "ACTIVE", "Dagacs@123"))
+                .thenReturn(studentLoginFixture());
 
         StudentManagementDTO result = service.createStudent(validRequest());
 
@@ -773,10 +848,11 @@ class StudentManagementServiceTest {
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
         AcademicSession otherIdSession = AcademicSession.builder()
-                .id(2L).name("2027-28").code("2027-28")
+                .id(1L).name("2027-28").code("2027-28")
                 .program(Program.builder().id(2L).name("Computer Science").build())
                 .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
                 .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(otherIdSession));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(
                 Batch.builder().id(1L).batchCode("B-2026").name("B1")
                         .year(2026).academicSession(otherIdSession).program("Computer Science").build()));

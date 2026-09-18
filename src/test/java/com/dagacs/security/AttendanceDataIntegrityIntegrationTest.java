@@ -198,7 +198,7 @@ class AttendanceDataIntegrityIntegrationTest {
                 .enrollmentNumber("E-" + System.nanoTime()).age(20)
                 .admissionDate("2020-01-01").status(status)
                 .email(null)
-                .batch(s.batch).section(s.section).program(s.program)
+                .academicSession(s.session).batch(s.batch).section(s.section).program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
     }
 

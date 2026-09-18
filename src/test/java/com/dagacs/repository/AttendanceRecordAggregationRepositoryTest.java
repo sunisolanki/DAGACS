@@ -90,6 +90,7 @@ class AttendanceRecordAggregationRepositoryTest {
                 .enrollmentNumber("E" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email("student-" + System.nanoTime() + "@dagacs.local")
+                .academicSession(section.getBatch().getAcademicSession())
                 .batch(section.getBatch()).section(section).program(section.getBatch().getAcademicSession().getProgram())
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }

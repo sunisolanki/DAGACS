@@ -9,10 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Create/update payload for the M5.2 Admin student master-management API.
- * Mirrors the existing master-data DTO conventions (Lombok, Bean Validation).
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -54,6 +50,12 @@ public class StudentManagementRequestDTO {
     @Size(max = 20, message = "Status must not exceed 20 characters")
     private String status;
 
+    @Size(max = 50, message = "Academic session must not exceed 50 characters")
+    private String academicSession;
+
+    @Size(max = 50, message = "Program must not exceed 50 characters")
+    private String program;
+
     @NotNull(message = "Program is required")
     private Long programId;
 
@@ -61,4 +63,8 @@ public class StudentManagementRequestDTO {
     private Long batchId;
 
     private Long sectionId;
+    private Long academicSessionId;
+
+    private String batch;
+    private String section;
 }

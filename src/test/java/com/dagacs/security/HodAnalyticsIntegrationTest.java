@@ -225,7 +225,7 @@ class HodAnalyticsIntegrationTest {
                 .enrollmentNumber("E-" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email(null)
-                .batch(s.batch).section(s.section).program(s.program)
+                .academicSession(s.session).batch(s.batch).section(s.section).program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
     }
 
@@ -871,7 +871,7 @@ class HodAnalyticsIntegrationTest {
                 .enrollmentNumber("E-CROSS-" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email(null)
-                .batch(a.batch).section(a.section).program(b.program)
+                .academicSession(a.session).batch(a.batch).section(a.section).program(b.program)
                 .createdAt(now()).updatedAt(now()).build());
 
         // 2 attendance records owned by Section A: 1 present, 1 absent → 50% → below 75%.

@@ -66,6 +66,11 @@ class StudentImportServiceTest {
         map.put("age", "");
         map.put("admissionDate", "");
         map.put("status", "");
+        map.put("academicSession", "2026-27");
+        map.put("program", "Computer Science");
+        map.put("batch", "B1");
+        map.put("section", "A");
+        map.put("academicSessionId", "1");
         map.put("programId", "1");
         map.put("batchId", "1");
         map.put("sectionId", "1");

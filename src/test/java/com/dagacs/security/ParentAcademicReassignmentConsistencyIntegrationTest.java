@@ -381,12 +381,13 @@ class ParentAcademicReassignmentConsistencyIntegrationTest {
                                 + "\"age\":20,"
                                 + "\"admissionDate\":\"2026-01-01\","
                                 + "\"status\":\"ACTIVE\","
+                                + "\"academicSessionId\":" + sessA.getId() + ","
                                 + "\"programId\":" + cs.getId() + ","
                                 + "\"batchId\":" + batchA.getId() + ","
                                 + "\"sectionId\":" + sectionA.getId()
                                 + "}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
-                        .value("Student program does not match batch academic session program"));
+                        .value("Academic session program does not match student program"));
     }
 }

@@ -69,6 +69,7 @@ class StudentPasswordChangeIntegrationTest {
     private long programId;
     private long batchId;
     private long sectionId;
+    private long academicSessionId;
 
     private String freshEmail(String prefix) {
         return prefix + Math.abs(System.nanoTime()) + "@dagacs.local";
@@ -96,6 +97,7 @@ class StudentPasswordChangeIntegrationTest {
         this.programId = program.getId();
         this.batchId = batch.getId();
         this.sectionId = section.getId();
+        this.academicSessionId = session.getId();
         return section.getId();
     }
 
@@ -111,11 +113,14 @@ class StudentPasswordChangeIntegrationTest {
                 + "\"gender\":\"F\","
                 + "\"fatherName\":\"Father\","
                 + "\"motherName\":\"Mother\","
+                + "\"photoUrl\":\"\","
+                + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
                 + "\"age\":20,"
                 + "\"admissionDate\":\"2026-01-01\","
                 + "\"programId\":" + programId + ","
                 + "\"batchId\":" + batchId + ","
-                + "\"sectionId\":" + sectionId
+                + "\"sectionId\":" + sectionId + ","
+                + "\"academicSessionId\":" + academicSessionId
                 + "}";
     }
 

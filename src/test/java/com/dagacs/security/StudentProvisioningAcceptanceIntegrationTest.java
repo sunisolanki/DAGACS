@@ -101,6 +101,7 @@ class StudentProvisioningAcceptanceIntegrationTest {
     private long programId;
     private long batchId;
     private long sectionId;
+    private long academicSessionId;
 
     private long createSectionEnv() {
         Department dept = departmentRepository.save(Department.builder()
@@ -124,6 +125,7 @@ class StudentProvisioningAcceptanceIntegrationTest {
         this.programId = program.getId();
         this.batchId = batch.getId();
         this.sectionId = section.getId();
+        this.academicSessionId = session.getId();
         return section.getId();
     }
 
@@ -137,9 +139,11 @@ class StudentProvisioningAcceptanceIntegrationTest {
                 + "\"motherName\":\"Mother\","
                 + "\"age\":20,"
                 + "\"admissionDate\":\"2026-01-01\","
+                + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
                 + "\"programId\":" + this.programId + ","
                 + "\"batchId\":" + this.batchId + ","
-                + "\"sectionId\":" + sectionId
+                + "\"sectionId\":" + sectionId + ","
+                + "\"academicSessionId\":" + this.academicSessionId
                 + "}";
     }
 
@@ -183,9 +187,11 @@ class StudentProvisioningAcceptanceIntegrationTest {
                 + "\"gender\":\"M\","
                 + "\"age\":20,"
                 + "\"admissionDate\":\"2026-01-01\","
+                + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
                 + "\"programId\":" + this.programId + ","
                 + "\"batchId\":" + this.batchId + ","
-                + "\"sectionId\":" + sectionId
+                + "\"sectionId\":" + sectionId + ","
+                + "\"academicSessionId\":" + this.academicSessionId
                 + "}";
 
         mockMvc.perform(post("/api/admin/students")

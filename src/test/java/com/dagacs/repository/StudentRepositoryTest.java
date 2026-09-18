@@ -60,7 +60,7 @@ class StudentRepositoryTest {
                 .fatherName("Father").motherName("Mother").photoUrl("url")
                 .enrollmentNumber("E" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
-                .batch(batch).section(section).program(program)
+                .academicSession(session).batch(batch).section(section).program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 

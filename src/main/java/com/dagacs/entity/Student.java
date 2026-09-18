@@ -28,37 +28,44 @@ public class Student {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    /**
+     * Optional fields - nullable for bulk import where these may be absent.
+     */
+    @Column(nullable = true)
     private String gender;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String fatherName;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String motherName;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String photoUrl;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String enrollmentNumber;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private Integer age;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String admissionDate;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "batch_id", nullable = false)
+    @JoinColumn(name = "batch_id", nullable = true)
     private Batch batch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "section_id")
+    @JoinColumn(name = "section_id", nullable = true)
     private Section section;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_session_id", nullable = false)
+    private AcademicSession academicSession;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "program_id", nullable = false)

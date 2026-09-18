@@ -16,28 +16,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StudentImportParserTest {
 
-    private static final String HEADER = "Roll Number,Email,Name,Gender,Father Name,"
-            + "Mother Name,Photo URL,Enrollment Number,Age,Admission Date,Status,"
-            + "Program ID,Batch ID,Section ID";
+    private static final String HEADER = "Name,Roll Number,Academic Session,Program,"
+            + "Email,Gender,Father Name,Mother Name,Photo URL,Enrollment Number,Age,"
+            + "Admission Date,Status,Batch,Section";
 
     private final StudentImportParser parser = new StudentImportParser();
 
     @Test
     void parsesValidCsv() {
         byte[] bytes = csv(HEADER,
-                "2201CE001,stu1@dagacs.local,Rahul Kumar,M,Father,Mother,,ENR-001,20,2026-01-01,ACTIVE,1,1,1",
-                "2201CE002,,Anjali,F,,,https://x/y.png,ENR-002,19,,INACTIVE,1,1,1");
+                "Rahul Kumar,2201CE001,2025-26,B.Tech,stu1@dagacs.local,M,Father,Mother,,ENR-001,20,2026-01-01,ACTIVE,B1,A",
+                "Anjali,2201CE002,2025-26,B.Tech,,F,,,https://x/y.png,ENR-002,19,,INACTIVE,B1,");
 
         List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
 
         assertEquals(2, rows.size());
         assertEquals(2, rows.get(0).rowNumber());
-        assertEquals("2201CE001", rows.get(0).values().get("rollNumber"));
-        assertEquals("stu1@dagacs.local", rows.get(0).values().get("email"));
         assertEquals("Rahul Kumar", rows.get(0).values().get("name"));
+        assertEquals("2201CE001", rows.get(0).values().get("rollNumber"));
+        assertEquals("2025-26", rows.get(0).values().get("academicSession"));
+        assertEquals("B.Tech", rows.get(0).values().get("program"));
+        assertEquals("stu1@dagacs.local", rows.get(0).values().get("email"));
         assertEquals("", rows.get(0).values().get("photoUrl"));
-        assertEquals("1", rows.get(0).values().get("programId"));
-        assertEquals("1", rows.get(0).values().get("sectionId"));
+        assertEquals("B1", rows.get(0).values().get("batch"));
+        assertEquals("A", rows.get(0).values().get("section"));
         assertEquals("", rows.get(1).values().get("email"));
         assertEquals("https://x/y.png", rows.get(1).values().get("photoUrl"));
     }
@@ -45,7 +47,7 @@ class StudentImportParserTest {
     @Test
     void stripsUtf8BomFromCsv() {
         byte[] bytes = ("\uFEFF" + HEADER + "\n"
-                + "2201CE001,,Rahul Kumar,,,,,,20,,ACTIVE,1,1,1\n")
+                + "Rahul Kumar,2201CE001,2025-26,B.Tech,,,,,,,,ACTIVE,B1\n")
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
@@ -57,7 +59,7 @@ class StudentImportParserTest {
     @Test
     void preservesCommasInsideQuotedCsvField() {
         byte[] bytes = csv(HEADER,
-                "2201CE001,,\"Kumar, Rahul\",,,,,,ENR-001,20,2026-01-01,ACTIVE,1,1,1");
+                "\"Kumar, Rahul\",2201CE001,2025-26,B.Tech,,,,,,,,,B1,");
 
         List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
 
@@ -68,7 +70,7 @@ class StudentImportParserTest {
     @Test
     void skipsBlankCsvRows_butKeepsPhysicalLineNumbers() {
         byte[] bytes = csv(HEADER, "", " ", ",,,,,,,,,,,,,,",
-                "2201CE001,,Rahul Kumar,,,,,,20,,ACTIVE,1,1,1");
+                "Rahul Kumar,2201CE001,2025-26,B.Tech,,,,,,,,,B1,");
 
         List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
 
@@ -85,15 +87,14 @@ class StudentImportParserTest {
         assertEquals(1, rows.size());
         assertEquals(2, rows.get(0).rowNumber());
         assertEquals(2201001L, Long.parseLong(rows.get(0).values().get("rollNumber")));
-        assertEquals(1L, Long.parseLong(rows.get(0).values().get("programId")));
     }
 
     @Test
     void headerIsCaseInsensitiveAndOrderInsensitive() {
-        byte[] bytes = ("programId,roll number,name,email,gender,father name,"
-                + "mother name,photo url,enrollment number,age,admission date,status,"
-                + "batch id,section id\n"
-                + "1,2201CE001,Rahul Kumar,,,,,,20,,ACTIVE,1,1\n")
+        byte[] bytes = ("name,roll number,academic session,program,"
+                + "email,gender,father name,mother name,photo url,enrollment number,age,"
+                + "admission date,status,batch,section\n"
+                + "Rahul Kumar,2201CE001,2025-26,B.Tech,,,,,,,,,B1,A\n")
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
@@ -104,8 +105,8 @@ class StudentImportParserTest {
 
     @Test
     void missingRequiredColumnRejected() {
-        byte[] bytes = ("Roll Number,Name,Program ID,Batch ID,Section ID\n"
-                + "2201CE001,Rahul Kumar,1,1,1\n")
+        byte[] bytes = ("Name,Roll Number,Program\n"
+                + "Rahul Kumar,2201CE001,B.Tech\n")
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         AuthException ex = assertThrows(AuthException.class,
@@ -118,7 +119,7 @@ class StudentImportParserTest {
     @Test
     void unknownColumnRejected() {
         byte[] bytes = csv(HEADER + ",Extra",
-                "2201CE001,,Rahul Kumar,,,,,,20,,ACTIVE,1,1,1,x");
+                "Rahul Kumar,2201CE001,2025-26,B.Tech,,,,,,,,,B1,A,x");
 
         AuthException ex = assertThrows(AuthException.class,
                 () -> parser.parse("students.csv", bytes));
@@ -178,12 +179,9 @@ class StudentImportParserTest {
                 headerRow.createCell(c).setCellValue(header[c]);
             }
             Row data = sheet.createRow(1);
-            data.createCell(0).setCellValue(2201001.0);
-            data.createCell(1).setCellValue("stu@dagacs.local");
-            data.createCell(2).setCellValue("Rahul Kumar");
-            data.createCell(12).setCellValue(1L);
-            data.createCell(13).setCellValue(1L);
-            data.createCell(11).setCellValue(1L);
+            data.createCell(1).setCellValue(2201001.0);
+            data.createCell(2).setCellValue("2025-26");
+            data.createCell(3).setCellValue("B.Tech");
             workbook.write(out);
             return out.toByteArray();
         }

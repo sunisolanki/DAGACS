@@ -183,7 +183,7 @@ class BatchAttendanceIntegrationTest {
                 .enrollmentNumber(enrollmentNumber).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
                 .email(null)
-                .batch(batch).section(null).program(s.program)
+                .academicSession(s.session).batch(batch).section(null).program(s.program)
                 .createdAt(now()).updatedAt(now()).build());
     }
 

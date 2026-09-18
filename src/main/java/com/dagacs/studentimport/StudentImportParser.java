@@ -21,60 +21,31 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * M9.10 Student bulk import parser.
- * <p>
- * Reads exactly two formats (matching the SOW and the locked M9.10 decision):
- * office {@code .xlsx} workbooks via the existing Apache POI dependency (read
- * path only - the frozen {@code com.dagacs.export} POI code stays untouched) and
- * {@code .csv} via a small hand-rolled RFC-4180 reader, so <b>no backend
- * dependency is added</b>.
- * </p>
- * <p>
- * The header contract is strict: exactly the 14 documented columns
- * (case-insensitive, space-tolerant, order-insensitive): Roll Number, Email,
- * Name, Gender, Father Name, Mother Name, Photo URL, Enrollment Number, Age,
- * Admission Date, Status, Program ID, Batch ID, Section ID. Academic references
- * are ID-based per the locked M9.10 decision - name/code lookup is not
- * implemented.
- * </p>
- * <p>
- * Each non-empty data row is returned as a {@link StudentImportRow} carrying the
- * physical row number the user sees in the file (Excel row / CSV line, header
- * counting as row 1, so the first data row is 2) plus its cell values keyed by
- * the canonical column name with every cell trimmed. Fully blank rows are
- * skipped. File-level problems (unsupported type, empty file, unreadable
- * workbook, header mismatch) surface as {@link AuthException} 400s following
- * existing DAGACS semantics; XLSX blank header cells are ignored rather than
- * treated as columns.
- * </p>
- */
 @Component
 public class StudentImportParser {
 
-    /** Canonical column names in header order (indexes match positions). */
-    public static final List<String> COLUMNS = List.of(
-            "rollNumber", "email", "name", "gender", "fatherName", "motherName",
-            "photoUrl", "enrollmentNumber", "age", "admissionDate", "status",
-            "programId", "batchId", "sectionId");
+    public static final List<String> REQUIRED_COLUMNS = List.of(
+            "name", "rollNumber", "academicSession", "program");
+
+    public static final List<String> OPTIONAL_COLUMNS = List.of(
+            "email", "gender", "fatherName", "motherName", "photoUrl",
+            "enrollmentNumber", "age", "admissionDate", "status",
+            "batch", "section");
 
     private static final Map<String, String> HEADER_ALIASES = buildAliases();
 
     private static final int MAX_ROWS = 2000;
 
-    private static final String EXPECTED_COLUMNS =
-            "Roll Number, Email, Name, Gender, Father Name, Mother Name, "
-                    + "Photo URL, Enrollment Number, Age, Admission Date, Status, "
-                    + "Program ID, Batch ID, Section ID";
+    private static final Set<String> KNOWN_COLUMNS = new HashSet<>();
 
-    /** A parsed, non-empty data row with its physical file row number. */
+    static {
+        KNOWN_COLUMNS.addAll(REQUIRED_COLUMNS);
+        KNOWN_COLUMNS.addAll(OPTIONAL_COLUMNS);
+    }
+
     public record StudentImportRow(int rowNumber, Map<String, String> values) {
     }
 
-    /**
-     * Parses the uploaded file into an ordered list of non-empty data rows.
-     * {@code filename} drives format detection (extension based).
-     */
     public List<StudentImportRow> parse(String filename, byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             throw new AuthException("The uploaded file is empty", 400);
@@ -159,7 +130,7 @@ public class StudentImportParser {
     }
 
     private void addRowIfPresent(List<StudentImportRow> rows, int rowNumber,
-                                 Map<String, String> values) {
+                                     Map<String, String> values) {
         if (values.values().stream().allMatch(String::isEmpty)) {
             return;
         }
@@ -185,14 +156,14 @@ public class StudentImportParser {
             String key = HEADER_ALIASES.get(normalizeHeader(raw));
             if (key == null) {
                 throw new AuthException(
-                        "Unknown column '" + raw + "'. Expected columns: " + EXPECTED_COLUMNS, 400);
+                        "Unknown column '" + raw + "'. Expected columns: " + expectedColumns(), 400);
             }
             if (!seen.add(key)) {
                 throw new AuthException("Duplicate column '" + raw + "' in the header", 400);
             }
             indexToColumn.put(c, key);
         }
-        ensureCompleteHeader(seen);
+        validateRequiredColumns(seen);
         return indexToColumn;
     }
 
@@ -209,24 +180,19 @@ public class StudentImportParser {
             String key = HEADER_ALIASES.get(normalizeHeader(raw));
             if (key == null) {
                 throw new AuthException(
-                        "Unknown column '" + raw + "'. Expected columns: " + EXPECTED_COLUMNS, 400);
+                        "Unknown column '" + raw + "'. Expected columns: " + expectedColumns(), 400);
             }
             if (!seen.add(key)) {
                 throw new AuthException("Duplicate column '" + raw + "' in the header", 400);
             }
             mapped.add(key);
         }
-        if (mapped.size() != COLUMNS.size()) {
-            ensureCompleteHeader(seen);
-            throw new AuthException(
-                    "Header contains more columns than the supported "
-                            + COLUMNS.size() + " import columns", 400);
-        }
+        validateRequiredColumns(seen);
         return mapped;
     }
 
-    private void ensureCompleteHeader(Set<String> seen) {
-        List<String> missing = COLUMNS.stream()
+    private void validateRequiredColumns(Set<String> seen) {
+        List<String> missing = REQUIRED_COLUMNS.stream()
                 .filter(column -> !seen.contains(column))
                 .toList();
         if (!missing.isEmpty()) {
@@ -258,13 +224,19 @@ public class StudentImportParser {
             case "photoUrl": return "Photo URL";
             case "enrollmentNumber": return "Enrollment Number";
             case "admissionDate": return "Admission Date";
-            case "programId": return "Program ID";
-            case "batchId": return "Batch ID";
-            case "sectionId": return "Section ID";
+            case "academicSession": return "Academic Session";
+            case "program": return "Program";
+            case "batch": return "Batch";
+            case "section": return "Section";
             default:
                 return canonical.substring(0, 1).toUpperCase(Locale.ROOT)
                         + canonical.substring(1);
         }
+    }
+
+    private static String expectedColumns() {
+        return "Required: " + REQUIRED_COLUMNS.stream().map(c -> displayName(c)).reduce((a, b) -> a + ", " + b).orElse("")
+                + ". Optional: " + OPTIONAL_COLUMNS.stream().map(c -> displayName(c)).reduce((a, b) -> a + ", " + b).orElse("");
     }
 
     private static Map<String, String> buildAliases() {
@@ -280,18 +252,13 @@ public class StudentImportParser {
         aliases.put("age", "age");
         aliases.put("admissiondate", "admissionDate");
         aliases.put("status", "status");
-        aliases.put("programid", "programId");
-        aliases.put("batchid", "batchId");
-        aliases.put("sectionid", "sectionId");
+        aliases.put("academicsession", "academicSession");
+        aliases.put("program", "program");
+        aliases.put("batch", "batch");
+        aliases.put("section", "section");
         return Map.copyOf(aliases);
     }
 
-    /**
-     * Minimal RFC-4180 reader (comma delimiter, double-quote quoting with
-     * {@code ""} escape, embedded newlines inside quoted fields). No external
-     * dependency - the format needed here is fixed and small. Blank cells are
-     * preserved as empty strings and trimmed by the caller.
-     */
     static List<List<String>> parseCsvRecords(String content) {
         List<List<String>> records = new ArrayList<>();
         List<String> current = new ArrayList<>();

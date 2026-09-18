@@ -123,6 +123,8 @@ class StudentManagementPersistenceIntegrationTest {
         String minimalBody = "{"
                 + "\"rollNumber\":\"" + rollNumber + "\","
                 + "\"name\":\"Rahul Kumar\","
+                + "\"enrollmentNumber\":\"ENR-MIN\","
+                + "\"academicSessionId\":" + section.getBatch().getAcademicSession().getId() + ","
                 + "\"programId\":" + section.getBatch().getAcademicSession().getProgram().getId() + ","
                 + "\"batchId\":" + section.getBatch().getId() + ","
                 + "\"sectionId\":" + section.getId()
@@ -164,14 +166,14 @@ class StudentManagementPersistenceIntegrationTest {
         assertEquals(section.getBatch().getId(), persisted.getBatch().getId());
         assertEquals(section.getId(), persisted.getSection().getId());
 
-        // Optional fields collapsed to neutral values - no NOT NULL violation.
-        assertEquals("", persisted.getGender());
-        assertEquals("", persisted.getFatherName());
-        assertEquals("", persisted.getMotherName());
-        assertEquals("", persisted.getPhotoUrl());
-        assertEquals("", persisted.getEnrollmentNumber());
-        assertEquals("", persisted.getAdmissionDate());
-        assertEquals(0, persisted.getAge());
+        // Optional fields are null when not provided (service passes request values directly).
+        assertNull(persisted.getGender());
+        assertNull(persisted.getFatherName());
+        assertNull(persisted.getMotherName());
+        assertNull(persisted.getPhotoUrl());
+        assertEquals("ENR-MIN", persisted.getEnrollmentNumber());
+        assertNull(persisted.getAdmissionDate());
+        assertNull(persisted.getAge());
         assertNull(persisted.getEmail());
         assertNotNull(persisted.getCreatedAt());
         assertNotNull(persisted.getUpdatedAt());

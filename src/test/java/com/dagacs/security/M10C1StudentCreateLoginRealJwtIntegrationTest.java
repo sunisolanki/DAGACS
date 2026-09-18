@@ -108,7 +108,8 @@ class M10C1StudentCreateLoginRealJwtIntegrationTest {
         // RUNTIME STEP 3: Create student WITHOUT email → HTTP 201, no auto-provision
         String roll2 = "STU" + System.nanoTime();
         String bodyNoEmail = "{\"rollNumber\":\"" + roll2 + "\",\"name\":\"Rahul Kumar\","
-                + "\"programId\":" + programId + ",\"batchId\":" + batchId + ",\"sectionId\":" + sectionId + "}";
+                + "\"enrollmentNumber\":\"ENR-M10C1\",\"academicSessionId\":" + sec.getBatch().getAcademicSession().getId()
+                + ",\"programId\":" + programId + ",\"batchId\":" + batchId + ",\"sectionId\":" + sectionId + "}";
         MvcResult createdNoEmail = mockMvc.perform(post("/api/admin/students")
                         .header("Authorization", "Bearer " + adminJwt)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -236,6 +237,7 @@ class M10C1StudentCreateLoginRealJwtIntegrationTest {
                 .age(20)
                 .admissionDate("2025-01-01")
                 .status("ACTIVE")
+                .academicSession(sec.getBatch().getAcademicSession())
                 .batch(batchRepo.findById(batchId).orElseThrow())
                 .section(sectionRepo.findById(sectionId).orElseThrow())
                 .program(progRepo.findById(programId).orElseThrow())
@@ -246,7 +248,7 @@ class M10C1StudentCreateLoginRealJwtIntegrationTest {
         mockMvc.perform(post("/api/admin/students/" + nullEmailStudent.getId() + "/login")
                         .header("Authorization", "Bearer " + adminJwt))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("The student has no email to link a login to"));
+                .andExpect(jsonPath("$.message").value("Student has no email linked"));
 
         mockMvc.perform(post("/api/admin/students/999999/login")
                         .header("Authorization", "Bearer " + adminJwt))

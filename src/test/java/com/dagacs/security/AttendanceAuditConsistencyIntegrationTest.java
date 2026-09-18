@@ -199,6 +199,7 @@ class AttendanceAuditConsistencyIntegrationTest {
                 .fatherName("Father").motherName("Mother").photoUrl("url")
                 .enrollmentNumber("E" + System.nanoTime()).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
+                .academicSession(session)
                 .batch(batch).section(sectionRepository.save(Section.builder()
                         .sectionCode("StSec-" + System.nanoTime()).name("A").maxCapacity(30)
                         .batch(batch).status("ACTIVE")

@@ -147,7 +147,7 @@ class TeacherProvisioningAcceptanceIntegrationTest {
                 .fatherName("Father").motherName("Mother").photoUrl("")
                 .enrollmentNumber("E" + Math.abs(System.nanoTime())).age(20)
                 .admissionDate("2026-01-01").status("ACTIVE")
-                .email(email).batch(batch).section(section).program(program)
+                .email(email).academicSession(session).batch(batch).section(section).program(program)
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 
