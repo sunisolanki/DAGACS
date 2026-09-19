@@ -21,6 +21,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.Rollback;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -177,5 +178,73 @@ class StudentManagementPersistenceIntegrationTest {
         assertNull(persisted.getEmail());
         assertNotNull(persisted.getCreatedAt());
         assertNotNull(persisted.getUpdatedAt());
+    }
+
+    @Test
+    void getStudentById_returnsProgramAndSessionNames() throws Exception {
+        Section section = createTestSection();
+        String token = adminToken();
+        String rollNumber = "STU" + System.nanoTime() + "-DETAIL";
+        String body = "{"
+                + "\"rollNumber\":\"" + rollNumber + "\","
+                + "\"name\":\"Detail Student\","
+                + "\"enrollmentNumber\":\"ENR-D\","
+                + "\"academicSessionId\":" + section.getBatch().getAcademicSession().getId() + ","
+                + "\"programId\":" + section.getBatch().getAcademicSession().getProgram().getId() + ","
+                + "\"batchId\":" + section.getBatch().getId() + ","
+                + "\"sectionId\":" + section.getId()
+                + "}";
+        MvcResult created = mockMvc.perform(post("/api/admin/students")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(get("/api/admin/students/" + id)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.programName").value("Computer Science"))
+                .andExpect(jsonPath("$.academicSessionName").isNotEmpty())
+                .andExpect(jsonPath("$.batchName").value("B1"))
+                .andExpect(jsonPath("$.sectionName").value("A"));
+    }
+
+    @Test
+    void listStudents_empty_returns200WithZeroResults() throws Exception {
+        String token = adminToken();
+        mockMvc.perform(get("/api/admin/students")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20));
+    }
+
+    @Test
+    void filterOptions_realDb_returns200WithData() throws Exception {
+        // Ensure master data exists by creating a student (which also creates session/program/batch/section via createTestSection)
+        createTestSection();
+        String token = adminToken();
+        mockMvc.perform(get("/api/admin/students/filter-options")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.academicSessions").isArray())
+                .andExpect(jsonPath("$.programs").isArray())
+                .andExpect(jsonPath("$.semesters").isArray())
+                .andExpect(jsonPath("$.batches").isArray())
+                .andExpect(jsonPath("$.sections").isArray());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void searchStudents_nonAdmin_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/students"))
+                .andExpect(status().isForbidden());
     }
 }

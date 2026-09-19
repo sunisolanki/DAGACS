@@ -23,7 +23,6 @@ import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentManagementRepository;
 import com.dagacs.repository.TeacherRepository;
 import com.dagacs.repository.UserRepository;
-import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -256,7 +255,7 @@ public class StudentManagementService {
                 batchId, sectionId, status, loginStatus);
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.ASC, "name"));
 
-        Page<Student> studentPage = studentRepository.findAll(fetchAware(filters), pageable);
+        Page<Student> studentPage = studentRepository.findAll(filters, pageable);
         Map<String, User> usersByEmail = loadUsersByEmail(studentPage.getContent());
         List<StudentManagementDTO> content = studentPage.getContent().stream()
                 .map(s -> convertToDTO(s, isLoginLinked(s, usersByEmail), usersByEmail))
@@ -484,26 +483,6 @@ public class StudentManagementService {
             combined = combined.and(parts.get(i));
         }
         return combined;
-    }
-
-    /**
-     * Wraps the predicate spec with LEFT fetch-joins so one page of students is
-     * loaded without N+1 for program/session/batch/section/semester. Fetch
-     * joins are skipped for count queries (result type Long) which Hibernate
-     * forbids anyway.
-     */
-    private Specification<Student> fetchAware(Specification<Student> base) {
-        return (root, query, cb) -> {
-            Class<?> resultType = query.getResultType();
-            if (resultType != Long.class && resultType != long.class) {
-                root.fetch("program", JoinType.LEFT);
-                root.fetch("academicSession", JoinType.LEFT);
-                root.fetch("batch", JoinType.LEFT);
-                root.fetch("section", JoinType.LEFT);
-                root.fetch("semester", JoinType.LEFT);
-            }
-            return base.toPredicate(root, query, cb);
-        };
     }
 
     /** Batch-loads the User for every page student (single query, no N+1). */

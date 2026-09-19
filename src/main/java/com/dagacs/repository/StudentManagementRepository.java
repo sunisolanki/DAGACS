@@ -1,6 +1,10 @@
 package com.dagacs.repository;
 
 import com.dagacs.entity.Student;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -27,4 +31,12 @@ public interface StudentManagementRepository extends JpaRepository<Student, Long
     Optional<Student> findByRollNumber(String rollNumber);
 
     List<Student> findAllByOrderByNameAsc();
+
+    @EntityGraph(attributePaths = {"program", "academicSession", "batch", "section", "semester"})
+    @Override
+    Optional<Student> findById(Long id);
+
+    @EntityGraph(attributePaths = {"program", "academicSession", "batch", "section", "semester"})
+    @Override
+    Page<Student> findAll(Specification<Student> spec, Pageable pageable);
 }
