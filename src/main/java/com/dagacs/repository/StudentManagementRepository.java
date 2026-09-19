@@ -2,6 +2,7 @@ package com.dagacs.repository;
 
 import com.dagacs.entity.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.Optional;
  * </p>
  */
 @Repository
-public interface StudentManagementRepository extends JpaRepository<Student, Long> {
+public interface StudentManagementRepository extends JpaRepository<Student, Long>, JpaSpecificationExecutor<Student> {
 
     boolean existsByRollNumber(String rollNumber);
 

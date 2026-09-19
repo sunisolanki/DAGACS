@@ -1,12 +1,16 @@
 package com.dagacs.service;
 
+import com.dagacs.dto.StudentFilterOption;
+import com.dagacs.dto.StudentFilterOptionsResponse;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
+import com.dagacs.dto.StudentPageResponse;
 import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Role;
 import com.dagacs.entity.Section;
+import com.dagacs.entity.Semester;
 import com.dagacs.entity.Student;
 import com.dagacs.entity.Teacher;
 import com.dagacs.entity.User;
@@ -15,6 +19,7 @@ import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentManagementRepository;
 import com.dagacs.repository.TeacherRepository;
 import com.dagacs.repository.UserRepository;
@@ -24,6 +29,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -62,6 +73,9 @@ class StudentManagementServiceTest {
     private SectionRepository sectionRepository;
 
     @Mock
+    private SemesterRepository semesterRepository;
+
+    @Mock
     private TeacherRepository teacherRepository;
 
     @Mock
@@ -76,11 +90,13 @@ class StudentManagementServiceTest {
     private Program program;
     private Batch batch;
     private Section section;
+    private AcademicSession session;
+    private Semester semester;
 
     @BeforeEach
     void setUp() {
         program = Program.builder().id(1L).name("Computer Science").code("CS").build();
-        AcademicSession session = AcademicSession.builder()
+        session = AcademicSession.builder()
                 .id(1L).name("2026-27").code("2026-27")
                 .program(program).description("")
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
@@ -90,6 +106,10 @@ class StudentManagementServiceTest {
                 .build();
         section = Section.builder().id(1L).sectionCode("SEC-A").name("A")
                 .batch(batch).status("ACTIVE").build();
+        semester = Semester.builder().id(1L).name("Sem 1").code("SEM1")
+                .year(1).academicSession(session)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
     }
 
     private StudentManagementRequestDTO validRequest() {
@@ -124,13 +144,10 @@ class StudentManagementServiceTest {
 
     private void stubValidReferences() {
         when(programRepository.findById(1L)).thenReturn(Optional.of(program));
-        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(
-                AcademicSession.builder().id(1L).name("2026-27").code("2026-27")
-                        .program(program).description("")
-                        .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
-                        .build()));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
         when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
     }
 
     /**
@@ -172,11 +189,6 @@ class StudentManagementServiceTest {
     }
 
     private Student existingStudent() {
-        AcademicSession session = AcademicSession.builder()
-                .id(1L).name("2026-27").code("2026-27")
-                .program(program).description("")
-                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
-                .build();
         return Student.builder()
                 .id(1L)
                 .rollNumber("2201CE001")
@@ -193,6 +205,7 @@ class StudentManagementServiceTest {
                 .program(program)
                 .batch(batch)
                 .section(section)
+                .semester(semester)
                 .academicSession(session)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -392,16 +405,219 @@ class StudentManagementServiceTest {
     }
 
     @Test
-    void getAllStudents_returnsListInNameOrder() {
+    void searchStudents_noFilters_returnsPagedContentIncludingSemester() {
         Student s = existingStudent();
-        when(studentRepository.findAllByOrderByNameAsc()).thenReturn(List.of(s));
-        stubNoLinkedLogin();
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(studentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(s), pageable, 1));
 
-        List<StudentManagementDTO> result = service.getAllStudents();
+        StudentPageResponse result = service.searchStudents(null, null, null, null, null, null,
+                null, null, 0, 20);
 
-        assertEquals(1, result.size());
-        assertEquals("2201CE001", result.get(0).getRollNumber());
-        assertEquals("Computer Science", result.get(0).getProgramName());
+        assertEquals(1, result.getContent().size());
+        assertEquals("2201CE001", result.getContent().get(0).getRollNumber());
+        assertEquals("Computer Science", result.getContent().get(0).getProgramName());
+        assertEquals(Long.valueOf(1L), result.getContent().get(0).getSemesterId());
+        assertEquals("Sem 1", result.getContent().get(0).getSemesterName());
+        assertEquals(1, result.getTotalElements());
+        assertEquals(1, result.getTotalPages());
+    }
+
+    @Test
+    void searchStudents_combinedFilters_returnsPagedContent() {
+        Student s = existingStudent();
+        Pageable pageable = PageRequest.of(1, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(studentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(s), pageable, 1));
+
+        StudentPageResponse result = service.searchStudents("rahul", 1L, 1L, 1L, 1L, 1L,
+                "ACTIVE", "ACTIVE", 1, 20);
+
+        assertEquals(1, result.getContent().size());
+        assertEquals(1, result.getPage());
+        verify(studentRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    void searchStudents_emptyResult_returnsEmptyPage() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(studentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        StudentPageResponse result = service.searchStudents("nobody", null, null, null, null, null,
+                "ACTIVE", null, 0, 20);
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+        assertEquals(0, result.getTotalPages());
+    }
+
+    @Test
+    void searchStudents_nullBatchSectionSemester_mapsNullsSafely() {
+        Student s = Student.builder()
+                .id(2L).rollNumber("2201CE002").name("Sita")
+                .status("ACTIVE")
+                .program(program)
+                .academicSession(session)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(studentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(s), pageable, 1));
+
+        StudentPageResponse result = service.searchStudents(null, null, null, null, null, null,
+                null, null, 0, 20);
+
+        assertEquals("Sita", result.getContent().get(0).getName());
+        assertEquals(null, result.getContent().get(0).getBatchName());
+        assertEquals(null, result.getContent().get(0).getSectionName());
+        assertEquals(null, result.getContent().get(0).getSemesterName());
+    }
+
+    @Test
+    void searchStudents_loginActiveStudents_flagViaBatchUserLoad() {
+        Student s = existingStudent();
+        User user = User.builder()
+                .id(7L).email("student1@dagacs.local")
+                .password("encoded").fullName("Rahul Kumar")
+                .phone("").status("ACTIVE").avatarUrl("")
+                .role(Role.builder().id(1L).name("STUDENT").build())
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name"));
+        when(studentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(s), pageable, 1));
+        when(userRepository.findByEmailIn(List.of("student1@dagacs.local"))).thenReturn(List.of(user));
+
+        StudentPageResponse result = service.searchStudents(null, null, null, null, null, null,
+                null, "ACTIVE", 0, 20);
+
+        StudentManagementDTO dto = result.getContent().get(0);
+        assertTrue(dto.isLoginLinked());
+        assertEquals("ACTIVE", dto.getLoginStatus());
+        verify(userRepository).findByEmailIn(List.of("student1@dagacs.local"));
+    }
+
+    @Test
+    void getFilterOptions_noSelection_returnsAllMasterDataOptions() {
+        when(academicSessionRepository.findAllByOrderByName()).thenReturn(List.of(session));
+        when(semesterRepository.findByAcademicSessionIn(any())).thenReturn(List.of(semester));
+        when(batchRepository.findByAcademicSessionIn(any())).thenReturn(List.of(batch));
+        when(sectionRepository.findByBatchIn(any())).thenReturn(List.of(section));
+
+        StudentFilterOptionsResponse result =
+                service.getFilterOptions(null, null, null, null, null);
+
+        assertEquals(1, result.getAcademicSessions().size());
+        assertEquals("2026-27", result.getAcademicSessions().get(0).getName());
+        assertEquals(1, result.getPrograms().size());
+        assertEquals("Computer Science", result.getPrograms().get(0).getName());
+        assertEquals(1, result.getSemesters().size());
+        assertEquals(Long.valueOf(1L), result.getSemesters().get(0).getId());
+        assertEquals(1, result.getBatches().size());
+        assertEquals(1, result.getSections().size());
+        assertEquals(Long.valueOf(1L), result.getSections().get(0).getBatchId());
+    }
+
+    @Test
+    void getFilterOptions_optionsAvailableWithZeroStudents() {
+        when(academicSessionRepository.findAllByOrderByName()).thenReturn(List.of(session));
+        when(semesterRepository.findByAcademicSessionIn(any())).thenReturn(List.of(semester));
+        when(batchRepository.findByAcademicSessionIn(any())).thenReturn(List.of(batch));
+        when(sectionRepository.findByBatchIn(any())).thenReturn(List.of(section));
+
+        StudentFilterOptionsResponse result =
+                service.getFilterOptions(null, null, null, null, null);
+
+        assertEquals(1, result.getSemesters().size());
+        assertEquals(1, result.getBatches().size());
+        assertEquals(1, result.getSections().size());
+    }
+
+    @Test
+    void getFilterOptions_sessionSelected_confinesOptionsToSession() {
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(semesterRepository.findByAcademicSessionIn(any())).thenReturn(List.of(semester));
+        when(batchRepository.findByAcademicSessionIn(any())).thenReturn(List.of(batch));
+        when(sectionRepository.findByBatchIn(any())).thenReturn(List.of(section));
+
+        StudentFilterOptionsResponse result =
+                service.getFilterOptions(1L, null, null, null, null);
+
+        assertEquals(1, result.getAcademicSessions().size());
+        assertEquals("2026-27", result.getAcademicSessions().get(0).getName());
+        assertEquals("Computer Science", result.getPrograms().get(0).getName());
+        assertEquals("Sem 1", result.getSemesters().get(0).getName());
+    }
+
+    @Test
+    void getFilterOptions_incoherentSelection_returnsEmptyOptions() {
+        AcademicSession otherSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28")
+                .program(Program.builder().id(2L).name("Electronics").build())
+                .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        Batch otherBatch = Batch.builder().id(2L).batchCode("B-2027").name("B2")
+                .year(2027).academicSession(otherSession).program("Electronics")
+                .build();
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(batchRepository.findById(2L)).thenReturn(Optional.of(otherBatch));
+
+        StudentFilterOptionsResponse result =
+                service.getFilterOptions(1L, null, null, 2L, null);
+
+        assertTrue(result.getAcademicSessions().isEmpty());
+        assertTrue(result.getPrograms().isEmpty());
+        assertTrue(result.getSemesters().isEmpty());
+        assertTrue(result.getBatches().isEmpty());
+    }
+
+    @Test
+    void getFilterOptions_unknownSession_returns404() {
+        when(academicSessionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        AuthException ex = assertThrows(AuthException.class,
+                () -> service.getFilterOptions(99L, null, null, null, null));
+        assertEquals(404, ex.getStatus());
+    }
+
+    @Test
+    void createStudent_semesterOutsideAcademicSession_returns400() {
+        AcademicSession otherSession = AcademicSession.builder()
+                .id(2L).name("2027-28").code("2027-28")
+                .program(Program.builder().id(2L).name("Electronics").build())
+                .description("").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now())
+                .build();
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(
+                Semester.builder().id(1L).name("Sem 1").code("SEM1")
+                        .year(1).academicSession(otherSession)
+                        .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build()));
+
+        StudentManagementRequestDTO request = validRequest();
+        request.setSemesterId(1L);
+
+        AuthException ex = assertThrows(AuthException.class, () -> service.createStudent(request));
+        assertEquals(400, ex.getStatus());
+        verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    void createStudent_semesterWithinSession_accepted() {
+        stubValidReferences();
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StudentManagementRequestDTO request = minimalRequest();
+        request.setSemesterId(1L);
+
+        StudentManagementDTO result = service.createStudent(request);
+
+        assertEquals(Long.valueOf(1L), result.getSemesterId());
+        assertEquals("Sem 1", result.getSemesterName());
+        verify(studentRepository).save(any(Student.class));
     }
 
     @Test

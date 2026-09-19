@@ -65,6 +65,8 @@ public class StudentManagementRequestDTO {
     private Long sectionId;
     private Long academicSessionId;
 
+    private Long semesterId;
+
     private String batch;
     private String section;
 }

@@ -64,6 +64,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\service\StudentManagementService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\config\AttendanceStudentSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentWiseCellDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentWiseRowDTO.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentFilterOptionsResponse.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherUpdateRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectOfferingRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Student.java
@@ -71,6 +72,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\validation\ValidAttendanceDateValidat
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\ProgramDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\SectionController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SemesterDTO.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentPageResponse.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Subject.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherManagementDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AttendanceService.java
@@ -117,6 +119,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\repository\SemesterRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\security\JwtAuthenticationFilter.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\TeacherStudentWiseReportRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\Batch.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentFilterOption.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\CredentialArtifact.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectOfferingDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherLoginRequestDTO.java

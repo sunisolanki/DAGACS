@@ -38,6 +38,8 @@ public class StudentManagementDTO {
     private String sectionName;
     private Long academicSessionId;
     private String academicSessionName;
+    private Long semesterId;
+    private String semesterName;
 
     private boolean loginLinked;
     private String loginStatus;

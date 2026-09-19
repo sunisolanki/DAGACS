@@ -1,6 +1,9 @@
 package com.dagacs.controller;
 
+import com.dagacs.dto.StudentFilterOption;
+import com.dagacs.dto.StudentFilterOptionsResponse;
 import com.dagacs.dto.StudentManagementDTO;
+import com.dagacs.dto.StudentPageResponse;
 import com.dagacs.exception.AuthException;
 import com.dagacs.service.StudentManagementService;
 import org.junit.jupiter.api.Test;
@@ -12,8 +15,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -99,14 +100,88 @@ class StudentManagementControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void getAllStudents_returns200() throws Exception {
-        when(studentManagementService.getAllStudents())
-                .thenReturn(List.of(dto(1L, "2201CE001", "Rahul Kumar", "ACTIVE")));
+    void searchStudents_returnsPaged200() throws Exception {
+        StudentPageResponse page = StudentPageResponse.builder()
+                .content(java.util.List.of(dto(1L, "2201CE001", "Rahul Kumar", "ACTIVE")))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .build();
+        when(studentManagementService.searchStudents(any(), any(), any(), any(), any(), any(),
+                any(), any(), eq(0), eq(20))).thenReturn(page);
 
         mockMvc.perform(get("/api/admin/students"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(1))
-                .andExpect(jsonPath("$[0].programName").value("Computer Science"));
+                .andExpect(jsonPath("$.content.size()").value(1))
+                .andExpect(jsonPath("$.content[0].programName").value("Computer Science"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void searchStudents_withFilters_returns200() throws Exception {
+        StudentPageResponse page = StudentPageResponse.builder()
+                .content(java.util.List.of(dto(1L, "2201CE001", "Rahul Kumar", "ACTIVE")))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .build();
+        when(studentManagementService.searchStudents(eq("rahul"), eq(1L), eq(2L), eq(3L), eq(4L), eq(5L),
+                eq("ACTIVE"), eq("ACTIVE"), eq(1), eq(50))).thenReturn(page);
+
+        mockMvc.perform(get("/api/admin/students")
+                        .param("search", "rahul")
+                        .param("programId", "1")
+                        .param("academicSessionId", "2")
+                        .param("semesterId", "3")
+                        .param("batchId", "4")
+                        .param("sectionId", "5")
+                        .param("status", "ACTIVE")
+                        .param("loginStatus", "ACTIVE")
+                        .param("page", "1")
+                        .param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].name").value("Rahul Kumar"));
+        verify(studentManagementService).searchStudents(eq("rahul"), eq(1L), eq(2L), eq(3L), eq(4L), eq(5L),
+                eq("ACTIVE"), eq("ACTIVE"), eq(1), eq(50));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getFilterOptions_returns200() throws Exception {
+        StudentFilterOptionsResponse response = StudentFilterOptionsResponse.builder()
+                .academicSessions(java.util.List.of(StudentFilterOption.builder().id(2L).name("2026-27").build()))
+                .programs(java.util.List.of())
+                .semesters(java.util.List.of())
+                .batches(java.util.List.of())
+                .sections(java.util.List.of())
+                .build();
+        when(studentManagementService.getFilterOptions(eq(2L), eq(1L), any(), any(), any())).thenReturn(response);
+
+        mockMvc.perform(get("/api/admin/students/filter-options")
+                        .param("academicSessionId", "2")
+                        .param("programId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.academicSessions.size()").value(1))
+                .andExpect(jsonPath("$.academicSessions[0].id").value(2))
+                .andExpect(jsonPath("$.programs.size()").value(0));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void searchStudents_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/students"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getFilterOptions_nonAdmin_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/students/filter-options"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

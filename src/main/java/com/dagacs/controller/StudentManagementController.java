@@ -1,7 +1,9 @@
 package com.dagacs.controller;
 
+import com.dagacs.dto.StudentFilterOptionsResponse;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
+import com.dagacs.dto.StudentPageResponse;
 import com.dagacs.dto.StudentPasswordUpdateRequestDTO;
 import com.dagacs.dto.StudentStatusDTO;
 import com.dagacs.service.StudentManagementService;
@@ -15,9 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * Admin student master-management API (M5.2).
@@ -47,8 +48,35 @@ public class StudentManagementController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StudentManagementDTO>> getAllStudents() {
-        return ResponseEntity.ok(studentManagementService.getAllStudents());
+    public ResponseEntity<StudentPageResponse> searchStudents(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long programId,
+            @RequestParam(required = false) Long academicSessionId,
+            @RequestParam(required = false) Long semesterId,
+            @RequestParam(required = false) Long batchId,
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String loginStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        StudentPageResponse response = studentManagementService.searchStudents(
+                search, programId, academicSessionId, semesterId,
+                batchId, sectionId, status, loginStatus,
+                page != null ? page : 0,
+                size != null ? size : 20);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/filter-options")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StudentFilterOptionsResponse> getFilterOptions(
+            @RequestParam(required = false) Long academicSessionId,
+            @RequestParam(required = false) Long programId,
+            @RequestParam(required = false) Long semesterId,
+            @RequestParam(required = false) Long batchId,
+            @RequestParam(required = false) Long sectionId) {
+        return ResponseEntity.ok(studentManagementService.getFilterOptions(
+                academicSessionId, programId, semesterId, batchId, sectionId));
     }
 
     @GetMapping("/{id}")

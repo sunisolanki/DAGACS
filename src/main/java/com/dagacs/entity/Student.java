@@ -67,6 +67,18 @@ public class Student {
     @JoinColumn(name = "academic_session_id", nullable = false)
     private AcademicSession academicSession;
 
+    /**
+     * The student's current semester, reusing the existing master-data
+     * {@link Semester} entity (like {@code SubjectOffering.semester}).
+     * Nullable so that existing/simple-imported students are not invalidated;
+     * the filter UI treats a null semester as a valid, selectable state under
+     * "All". Semester is deliberately stored, not derived (see the frozen
+     * export/analytics stance: "semester is NOT derivable").
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "semester_id", nullable = true)
+    private Semester semester;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "program_id", nullable = false)
     private Program program;
