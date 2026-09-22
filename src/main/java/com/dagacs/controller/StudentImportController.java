@@ -47,6 +47,17 @@ public class StudentImportController {
         return ResponseEntity.status(status).body(result);
     }
 
+    @PostMapping(path = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StudentImportResult> previewImport(
+            @RequestPart("file") MultipartFile file) throws IOException {
+        String filename = file.getOriginalFilename();
+        StudentImportResult result = studentImportService.previewImport(
+                filename == null || filename.isBlank() ? "upload.xlsx" : filename,
+                file.getBytes());
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/credentials/{downloadId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<byte[]> downloadCredentials(@PathVariable String downloadId) {

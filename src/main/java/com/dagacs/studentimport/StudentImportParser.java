@@ -30,7 +30,7 @@ public class StudentImportParser {
     public static final List<String> OPTIONAL_COLUMNS = List.of(
             "email", "gender", "fatherName", "motherName", "photoUrl",
             "enrollmentNumber", "age", "admissionDate", "status",
-            "batch", "section");
+            "batch", "section", "semester");
 
     private static final Map<String, String> HEADER_ALIASES = buildAliases();
 
@@ -228,6 +228,7 @@ public class StudentImportParser {
             case "program": return "Program";
             case "batch": return "Batch";
             case "section": return "Section";
+            case "semester": return "Semester";
             default:
                 return canonical.substring(0, 1).toUpperCase(Locale.ROOT)
                         + canonical.substring(1);
@@ -256,6 +257,10 @@ public class StudentImportParser {
         aliases.put("program", "program");
         aliases.put("batch", "batch");
         aliases.put("section", "section");
+        aliases.put("semester", "semester");
+        aliases.put("programid", "program");
+        aliases.put("batchid", "batch");
+        aliases.put("sectionid", "section");
         return Map.copyOf(aliases);
     }
 

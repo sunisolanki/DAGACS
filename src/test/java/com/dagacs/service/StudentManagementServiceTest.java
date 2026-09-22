@@ -45,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -1077,5 +1078,46 @@ class StudentManagementServiceTest {
         assertEquals(400, ex.getStatus());
         assertTrue(ex.getMessage().contains("program"));
         verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    void createStudent_nameBasedSemester_resolvesViaFindByNameAndAcademicSession() {
+        when(programRepository.findById(1L)).thenReturn(Optional.of(program));
+        when(academicSessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
+        when(sectionRepository.findById(1L)).thenReturn(Optional.of(section));
+        when(semesterRepository.findByNameAndAcademicSession("Sem 1", session))
+                .thenReturn(Optional.of(semester));
+        when(semesterRepository.findById(1L)).thenReturn(Optional.of(semester));
+        stubNoCollisionOrLink();
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(accountProvisioningService.provisionTemporaryLogin(
+                anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(studentLoginFixture());
+
+        StudentManagementRequestDTO request = StudentManagementRequestDTO.builder()
+                .rollNumber("2201CE001")
+                .email("student1@dagacs.local")
+                .name("Rahul Kumar")
+                .gender("M")
+                .fatherName("Father")
+                .motherName("Mother")
+                .photoUrl("")
+                .enrollmentNumber("ENR-001")
+                .age(20)
+                .admissionDate("2026-01-01")
+                .status("ACTIVE")
+                .academicSessionId(1L)
+                .programId(1L)
+                .batchId(1L)
+                .sectionId(1L)
+                .semester("Sem 1")
+                .build();
+
+        StudentManagementDTO result = service.createStudent(request);
+
+        assertNotNull(result);
+        verify(semesterRepository).findByNameAndAcademicSession("Sem 1", session);
+        verify(studentRepository).save(any(Student.class));
     }
 }

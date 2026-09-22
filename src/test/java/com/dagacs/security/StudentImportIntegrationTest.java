@@ -5,12 +5,14 @@ import com.dagacs.entity.Batch;
 import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
 import com.dagacs.entity.Section;
+import com.dagacs.entity.Semester;
 import com.dagacs.entity.User;
 import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
 import com.dagacs.repository.SectionRepository;
+import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentManagementRepository;
 import com.dagacs.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,6 +87,9 @@ class StudentImportIntegrationTest {
 
     @Autowired
     private SectionRepository sectionRepository;
+
+    @Autowired
+    private SemesterRepository semesterRepository;
 
     @Autowired
     private StudentManagementRepository studentManagementRepository;
@@ -147,15 +153,15 @@ class StudentImportIntegrationTest {
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 
-    private long createStudentOnAnotherProgram(String token, Section section,
-                                               String rollNumber, String email) throws Exception {
+private long createStudentOnAnotherProgram(String token, Section section,
+                                                String rollNumber, String email) throws Exception {
         String body = "{"
                 + "\"rollNumber\":\"" + rollNumber + "\","
                 + "\"email\":\"" + email + "\","
                 + "\"name\":\"Existing Student\","
                 + "\"gender\":\"M\","
                 + "\"photoUrl\":\"\","
-                + "\"enrollmentNumber\":\"ENR-" + System.nanoTime() + "\","
+                + "\"enrollmentNumber\":\"" + rollNumber + "\","
                 + "\"age\":20,"
                 + "\"admissionDate\":\"2026-01-01\","
                 + "\"status\":\"ACTIVE\","
@@ -187,8 +193,8 @@ class StudentImportIntegrationTest {
         oneSectionFixture();
 
         byte[] xlsx = xlsx(
-                new String[]{"Aarav Sharma","IMPR1","SessY","Computer Science Y","impr1@dagacs.local","M","","","","ENR-X1","20","2026-01-01","ACTIVE","B-Y","A"},
-                new String[]{"Priya Patel","IMPR2","SessY","Computer Science Y","impr2@dagacs.local","F","","","","ENR-X2","21","2026-01-01","INACTIVE","B-Y","A"});
+                new String[]{"Aarav Sharma","IMPR1","SessY","Computer Science Y","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","ACTIVE","B-Y","A"},
+                new String[]{"Priya Patel","IMPR2","SessY","Computer Science Y","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","INACTIVE","B-Y","A"});
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.xlsx",
@@ -210,8 +216,8 @@ class StudentImportIntegrationTest {
         oneSectionFixture();
 
         byte[] xlsx = xlsx(
-                new String[]{"Mia Kapoor","MATCH1","SessY","Computer Science Y","match1@dagacs.local","F","","","","ENR-M1","20","2026-01-01","ACTIVE","B-Y","A"},
-                new String[]{"Arjun Rao","MATCH2","SessY","Computer Science Y","match2@dagacs.local","M","","","","ENR-M2","21","2026-01-01","ACTIVE","B-Y","A"});
+                new String[]{"Mia Kapoor","MATCH1","SessY","Computer Science Y","match1@dagacs.local","F","","","","MATCH1","20","2026-01-01","ACTIVE","B-Y","A"},
+                new String[]{"Arjun Rao","MATCH2","SessY","Computer Science Y","match2@dagacs.local","M","","","","MATCH2","21","2026-01-01","ACTIVE","B-Y","A"});
 
         MvcResult importResult = mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.xlsx",
@@ -270,8 +276,8 @@ class StudentImportIntegrationTest {
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                "Aarav Sharma,IMPC1,SessY,Computer Science Y,impc1@dagacs.local,M,,,,ENR-C1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Priya Patel,IMPC2,SessY,Computer Science Y,impc2@dagacs.local,F,,,,ENR-C2,21,2026-01-01,ACTIVE,B-Y,A");
+                "Aarav Sharma,IMPC1,SessY,Computer Science Y,impc1@dagacs.local,M,,,,IMPC1,20,2026-01-01,ACTIVE,B-Y,A",
+                "Priya Patel,IMPC2,SessY,Computer Science Y,impc2@dagacs.local,F,,,,IMPC2,21,2026-01-01,ACTIVE,B-Y,A");
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.csv",
@@ -292,8 +298,8 @@ class StudentImportIntegrationTest {
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                "First,DUPR1,SessY,Computer Science Y,dupr1a@dagacs.local,M,,,,ENR-D1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Second,DUPR1,SessY,Computer Science Y,dupr1b@dagacs.local,M,,,,ENR-D2,20,2026-01-01,ACTIVE,B-Y,A");
+                "First,DUPR1,SessY,Computer Science Y,dupr1a@dagacs.local,M,,,,DUPR1,20,2026-01-01,ACTIVE,B-Y,A",
+                "Second,DUPR1,SessY,Computer Science Y,dupr1b@dagacs.local,M,,,,DUPR1,20,2026-01-01,ACTIVE,B-Y,A");
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
@@ -315,7 +321,7 @@ class StudentImportIntegrationTest {
         createStudentOnAnotherProgram(admin, section, "EXIST1", "shared@dagacs.local");
 
         byte[] csv = csvBody(
-                "New Row,NEWROW,SessY,Computer Science Y,shared@dagacs.local,M,,,,ENR-N1,20,2026-01-01,ACTIVE,B-Y,A");
+                "New Row,NEWROW,SessY,Computer Science Y,shared@dagacs.local,M,,,,NEWROW,20,2026-01-01,ACTIVE,B-Y,A");
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
@@ -342,7 +348,7 @@ class StudentImportIntegrationTest {
         Section sectionCS = createSection(batchCS, "A", "A");
 
         byte[] csv = csvBody(
-                "MISMATCH,mismatch@dagacs.local,SessCS,Electrical X,mismatch@dagacs.local,M,,,,ENR-M1,20,2026-01-01,ACTIVE,B-CS,A");
+                "MISMATCH,MISMATCH,SessCS,Electrical X,mismatch@dagacs.local,M,,,,MISMATCH,20,2026-01-01,ACTIVE,B-CS,A");
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
@@ -362,8 +368,8 @@ class StudentImportIntegrationTest {
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                ",MISSING1,SessY,Computer Science Y,,M,,,,ENR-NN1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Valid,MISSING2,SessY,Computer Science Y,missing2@dagacs.local,M,,,,ENR-NN2,20,2026-01-01,ACTIVE,B-Y,A");
+                ",MISSING1,SessY,Computer Science Y,,M,,,,MISSING1,20,2026-01-01,ACTIVE,B-Y,A",
+                "Valid,MISSING2,SessY,Computer Science Y,missing2@dagacs.local,M,,,,MISSING2,20,2026-01-01,ACTIVE,B-Y,A");
 
         mockMvc.perform(multipart("/api/admin/students/import")
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
@@ -380,6 +386,29 @@ class StudentImportIntegrationTest {
     }
 
     @Test
+    void previewImport_validXlsx_returns200SummaryWithoutPersisting() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+
+        byte[] xlsx = xlsx(
+                new String[]{"Aarav Sharma","IMPR1","SessY","Computer Science Y","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","ACTIVE","B-Y","A"},
+                new String[]{"Priya Patel","IMPR2","SessY","Computer Science Y","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","INACTIVE","B-Y","A"});
+
+        mockMvc.perform(multipart("/api/admin/students/import/preview")
+                        .file(new MockMultipartFile("file", "students.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                xlsx))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRows").value(2))
+                .andExpect(jsonPath("$.importedRows").value(0))
+                .andExpect(jsonPath("$.rejectedRows").value(0));
+
+        assertFalse(studentManagementRepository.existsByRollNumber("IMPR1"));
+        assertFalse(studentManagementRepository.existsByRollNumber("IMPR2"));
+    }
+
+    @Test
     void headerMismatch_returns400() throws Exception {
         String admin = adminToken();
         byte[] csv = ("Roll Number,Name,Program ID,Batch ID,Section ID\n"
@@ -390,6 +419,40 @@ class StudentImportIntegrationTest {
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void headerAliases_programId_batchId_sectionId_accepted() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+
+        byte[] csv = ("Name,Roll Number,Academic Session,Program ID,Batch ID,Section ID\n"
+                + "Rahul,2201CE001,SessY,Computer Science Y,B-Y,A\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        mockMvc.perform(multipart("/api/admin/students/import")
+                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRows").value(1))
+                .andExpect(jsonPath("$.importedRows").value(1));
+    }
+
+    @Test
+    void semesterColumn_accepted() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+
+        byte[] csv = ("Name,Roll Number,Academic Session,Program,Batch,Section,Semester\n"
+                + "Rahul,2201CE001,SessY,Computer Science Y,B-Y,A,Sem 1\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        mockMvc.perform(multipart("/api/admin/students/import")
+                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRows").value(1))
+                .andExpect(jsonPath("$.importedRows").value(1));
     }
 
     @Test
@@ -450,7 +513,15 @@ class StudentImportIntegrationTest {
         Program program = createProgram(dept, "Computer Science Y", "CSY");
         AcademicSession session = createSession(program, "SessY");
         Batch batch = createBatch(session, "B-Y", "BY");
+        Semester semester = createSemester(session, "Sem 1", "SEM1");
         return createSection(batch, "A", "A");
+    }
+
+    private Semester createSemester(AcademicSession session, String name, String code) {
+        return semesterRepository.save(Semester.builder()
+                .name(name).code(code).year(1)
+                .academicSession(session)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 
     private static byte[] csvBody(String... dataRows) {

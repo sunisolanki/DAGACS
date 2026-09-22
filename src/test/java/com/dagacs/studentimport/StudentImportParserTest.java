@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -167,6 +168,49 @@ class StudentImportParserTest {
 
         assertEquals(400, ex.getStatus());
         assertTrue(ex.getMessage().contains("Could not read the XLSX file"));
+    }
+
+    @Test
+    void headerAliases_programId_batchId_sectionId_accepted() {
+        String header = "Name,Roll Number,Academic Session,Program ID,Email,"
+                + "Gender,Father Name,Mother Name,Photo URL,Enrollment Number,Age,"
+                + "Admission Date,Status,Batch ID,Section ID";
+        byte[] bytes = csv(header,
+                "Rahul Kumar,2201CE001,2025-26,M.Tech,stu1@dagacs.local,M,Father,Mother,,ENR-001,20,2026-01-01,ACTIVE,Batch1,SectionA");
+
+        List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
+
+        assertEquals(1, rows.size());
+        assertEquals("M.Tech", rows.get(0).values().get("program"));
+        assertEquals("Batch1", rows.get(0).values().get("batch"));
+        assertEquals("SectionA", rows.get(0).values().get("section"));
+    }
+
+    @Test
+    void semesterColumn_parsed() {
+        String header = "Name,Roll Number,Academic Session,Program,Email,"
+                + "Gender,Father Name,Mother Name,Photo URL,Enrollment Number,Age,"
+                + "Admission Date,Status,Batch,Section,Semester";
+        byte[] bytes = csv(header,
+                "Rahul Kumar,2201CE001,2025-26,B.Tech,stu1@dagacs.local,M,Father,Mother,,ENR-001,20,2026-01-01,ACTIVE,B1,A,3rd Semester");
+
+        List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
+
+        assertEquals(1, rows.size());
+        assertEquals("3rd Semester", rows.get(0).values().get("semester"));
+    }
+
+    @Test
+    void enrollmentNumberAbsent_isNullInParsedRow() {
+        String header = "Name,Roll Number,Academic Session,Program";
+        byte[] bytes = csv(header,
+                "Rahul Kumar,2201CE001,2025-26,B.Tech");
+
+        List<StudentImportParser.StudentImportRow> rows = parser.parse("students.csv", bytes);
+
+        assertEquals(1, rows.size());
+        assertEquals("2201CE001", rows.get(0).values().get("rollNumber"));
+        assertNull(rows.get(0).values().get("enrollmentNumber"));
     }
 
     private static byte[] xlsxWithNumericRoll() throws Exception {

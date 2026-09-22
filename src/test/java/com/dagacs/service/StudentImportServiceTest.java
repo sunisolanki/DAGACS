@@ -249,4 +249,34 @@ class StudentImportServiceTest {
         assertEquals(400, ex.getStatus());
         assertTrue(ex.getMessage().contains("no student rows"));
     }
+
+    @Test
+    void previewImport_validFile_returnsSummaryWithoutPersisting() {
+        when(parser.parse("students.csv", new byte[]{1}))
+                .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
+                        new StudentImportRow(3, row("R2", "b@dagacs.local", "Bob"))));
+
+        StudentImportResult result = service.previewImport("students.csv", new byte[]{1});
+
+        assertEquals(2, result.getTotalRows());
+        assertEquals(0, result.getImportedRows());
+        assertEquals(0, result.getRejectedRows());
+        assertTrue(result.getErrors().isEmpty());
+        verify(studentManagementService, never()).createStudent(any());
+    }
+
+    @Test
+    void previewImport_invalidFile_returnsErrorsWithoutPersisting() {
+        when(parser.parse("students.csv", new byte[]{1}))
+                .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
+                        new StudentImportRow(3, row("R1", "b@dagacs.local", "Bob"))));
+
+        StudentImportResult result = service.previewImport("students.csv", new byte[]{1});
+
+        assertEquals(2, result.getTotalRows());
+        assertEquals(0, result.getImportedRows());
+        assertEquals(1, result.getRejectedRows());
+        assertEquals(409, result.getErrors().get(0).getStatus());
+        verify(studentManagementService, never()).createStudent(any());
+    }
 }

@@ -47,8 +47,56 @@ public class StudentImportService {
         this.validator = validator;
     }
 
+    @Transactional(readOnly = true)
+    public StudentImportResult previewImport(String filename, byte[] bytes) {
+        return validateImport(filename, bytes);
+    }
+
     @Transactional
     public StudentImportResult importStudents(String filename, byte[] bytes) {
+        StudentImportResult preview = validateImport(filename, bytes);
+        if (preview.getRejectedRows() > 0) {
+            return preview;
+        }
+
+        List<StudentImportRow> rows = parser.parse(filename, bytes);
+        List<StudentManagementRequestDTO> validRows = preview.getErrors().isEmpty()
+                ? buildValidRows(rows)
+                : new ArrayList<>();
+
+        int totalRows = rows.size();
+        int importedRows = 0;
+        Map<String, String> importTempPasswords = new HashMap<>();
+        if (preview.getErrors().isEmpty()) {
+            for (StudentManagementRequestDTO dto : validRows) {
+                StudentManagementDTO created = studentManagementService.createStudent(dto);
+                importedRows++;
+                collectTemporaryPassword(created, importTempPasswords);
+            }
+        }
+
+        String message = preview.getErrors().isEmpty()
+                ? "Imported " + importedRows + " of " + totalRows + " students."
+                : "Import failed: " + preview.getErrors().size() + " row(s) rejected. "
+                        + "No students were imported.";
+
+        String credentialDownloadId = null;
+        if (preview.getErrors().isEmpty() && !importTempPasswords.isEmpty()) {
+            credentialDownloadId = generateCredentialArtifact(validRows, importTempPasswords);
+        }
+
+        return StudentImportResult.builder()
+                .totalRows(totalRows)
+                .importedRows(importedRows)
+                .rejectedRows(preview.getErrors().size())
+                .message(message)
+                .errors(preview.getErrors())
+                .credentialDownloadId(credentialDownloadId)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    private StudentImportResult validateImport(String filename, byte[] bytes) {
         List<StudentImportRow> rows = parser.parse(filename, bytes);
         if (rows.isEmpty()) {
             throw new AuthException(
@@ -108,36 +156,25 @@ public class StudentImportService {
             }
         }
 
-        int totalRows = rows.size();
-        int importedRows = 0;
-        Map<String, String> importTempPasswords = new HashMap<>();
-        if (errors.isEmpty()) {
-            for (StudentManagementRequestDTO dto : validRows) {
-                StudentManagementDTO created = studentManagementService.createStudent(dto);
-                importedRows++;
-                collectTemporaryPassword(created, importTempPasswords);
-            }
-        }
-
-        boolean conflict = errors.stream().anyMatch(e -> e.getStatus() == 409);
-        String message = errors.isEmpty()
-                ? "Imported " + importedRows + " of " + totalRows + " students."
-                : "Import failed: " + errors.size() + " row(s) rejected. "
-                        + "No students were imported.";
-
-        String credentialDownloadId = null;
-        if (errors.isEmpty() && !importTempPasswords.isEmpty()) {
-            credentialDownloadId = generateCredentialArtifact(validRows, importTempPasswords);
-        }
-
         return StudentImportResult.builder()
-                .totalRows(totalRows)
-                .importedRows(importedRows)
+                .totalRows(rows.size())
+                .importedRows(0)
                 .rejectedRows(errors.size())
-                .message(message)
+                .message(errors.isEmpty()
+                        ? "All " + rows.size() + " rows are valid."
+                        : errors.size() + " row(s) rejected.")
                 .errors(errors)
-                .credentialDownloadId(credentialDownloadId)
                 .build();
+    }
+
+    private List<StudentManagementRequestDTO> buildValidRows(List<StudentImportRow> rows) {
+        List<StudentManagementRequestDTO> validRows = new ArrayList<>();
+        for (StudentImportRow entry : rows) {
+            Map<String, String> row = entry.values();
+            StudentManagementRequestDTO dto = buildDto(row, new ArrayList<>(), entry.rowNumber());
+            validRows.add(dto);
+        }
+        return validRows;
     }
 
     private void collectTemporaryPassword(StudentManagementDTO created,
@@ -214,11 +251,22 @@ public class StudentImportService {
         String programName = trim(row.get("program"));
         String batchName = trim(row.get("batch"));
         String sectionName = trim(row.get("section"));
+        String semesterName = trim(row.get("semester"));
 
         String roll = trim(row.get("rollNumber"));
         String email = trim(row.get("email"));
         if (email == null || email.isBlank()) {
             email = roll != null ? roll.toLowerCase(java.util.Locale.ROOT) + "@dagacs.local" : null;
+        }
+
+        String enrollmentNumber = trim(row.get("enrollmentNumber"));
+        if (enrollmentNumber == null || enrollmentNumber.isBlank()) {
+            enrollmentNumber = roll;
+        } else if (roll != null && !enrollmentNumber.equals(roll)) {
+            errors.add(StudentImportResult.RowError.builder()
+                    .rowNumber(rowNumber).field("enrollmentNumber").status(400)
+                    .message("Enrollment Number conflicts with Roll Number: " + enrollmentNumber)
+                    .build());
         }
 
         StudentManagementRequestDTO dto = StudentManagementRequestDTO.builder()
@@ -229,7 +277,7 @@ public class StudentImportService {
                 .fatherName(trim(row.get("fatherName")))
                 .motherName(trim(row.get("motherName")))
                 .photoUrl(trim(row.get("photoUrl")))
-                .enrollmentNumber(trim(row.get("enrollmentNumber")))
+                .enrollmentNumber(enrollmentNumber)
                 .age(parseOptionalInteger(row.get("age"), errors, rowNumber))
                 .admissionDate(trim(row.get("admissionDate")))
                 .status(trim(row.get("status")))
@@ -237,6 +285,7 @@ public class StudentImportService {
                 .program(programName)
                 .batch(batchName)
                 .section(sectionName)
+                .semester(semesterName)
                 .academicSessionId(parseOptionalId(row.get("academicSessionId"), errors, rowNumber, "academicSessionId"))
                 .programId(parseOptionalId(row.get("programId"), errors, rowNumber, "programId"))
                 .batchId(parseOptionalId(row.get("batchId"), errors, rowNumber, "batchId"))

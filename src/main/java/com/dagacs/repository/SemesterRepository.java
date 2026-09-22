@@ -19,4 +19,5 @@ public interface SemesterRepository extends JpaRepository<Semester, Long> {
     boolean existsByName(String name);
     boolean existsByCode(String code);
     boolean existsByNameAndAcademicSession(String name, AcademicSession academicSession);
+    Optional<Semester> findByNameAndAcademicSession(String name, AcademicSession academicSession);
 }

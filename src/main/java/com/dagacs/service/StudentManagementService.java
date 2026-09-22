@@ -528,16 +528,28 @@ public class StudentManagementService {
     }
 
     private Semester resolveSemester(StudentManagementRequestDTO request, AcademicSession academicSession) {
-        if (request.getSemesterId() == null) {
-            return null;
+        if (request.getSemesterId() != null) {
+            Semester semester = semesterRepository.findById(request.getSemesterId())
+                    .orElseThrow(() -> new AuthException(
+                            "Semester not found with id: " + request.getSemesterId(), 404));
+            if (!semester.getAcademicSession().getId().equals(academicSession.getId())) {
+                throw new AuthException("Semester does not belong to the specified academic session", 400);
+            }
+            return semester;
         }
-        Semester semester = semesterRepository.findById(request.getSemesterId())
-                .orElseThrow(() -> new AuthException(
-                        "Semester not found with id: " + request.getSemesterId(), 404));
-        if (!semester.getAcademicSession().getId().equals(academicSession.getId())) {
-            throw new AuthException("Semester does not belong to the specified academic session", 400);
+
+        if (request.getSemester() != null && !request.getSemester().isBlank()) {
+            Semester semester = semesterRepository.findByNameAndAcademicSession(
+                    request.getSemester(), academicSession)
+                    .orElseThrow(() -> new AuthException(
+                            "Semester not found: " + request.getSemester(), 404));
+            if (!semester.getAcademicSession().getId().equals(academicSession.getId())) {
+                throw new AuthException("Semester does not belong to the specified academic session", 400);
+            }
+            return semester;
         }
-        return semester;
+
+        return null;
     }
 
     @Transactional(readOnly = true)

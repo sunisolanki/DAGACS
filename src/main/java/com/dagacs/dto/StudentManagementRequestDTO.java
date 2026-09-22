@@ -69,4 +69,5 @@ public class StudentManagementRequestDTO {
 
     private String batch;
     private String section;
+    private String semester;
 }
