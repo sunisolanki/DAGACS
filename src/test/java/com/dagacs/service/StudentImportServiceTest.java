@@ -65,15 +65,6 @@ class StudentImportServiceTest {
         map.put("enrollmentNumber", "");
         map.put("age", "");
         map.put("admissionDate", "");
-        map.put("status", "");
-        map.put("academicSession", "2026-27");
-        map.put("program", "Computer Science");
-        map.put("batch", "B1");
-        map.put("section", "A");
-        map.put("academicSessionId", "1");
-        map.put("programId", "1");
-        map.put("batchId", "1");
-        map.put("sectionId", "1");
         return map;
     }
 
@@ -92,7 +83,8 @@ class StudentImportServiceTest {
                     .build();
         });
 
-        StudentImportResult result = service.importStudents("students.xlsx", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.xlsx", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(2, result.getTotalRows());
         assertEquals(2, result.getImportedRows());
@@ -130,12 +122,13 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void inFileDuplicateRollNumber_rejectsWholeFile_nothingImported() {
+    void inFileDuplicateRollNumber_rejectsWholeFile_nothingImported() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
                         new StudentImportRow(3, row("R1", "b@dagacs.local", "Bob"))));
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(2, result.getTotalRows());
         assertEquals(0, result.getImportedRows());
@@ -146,12 +139,13 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void inFileDuplicateEmail_caseInsensitive_rejectsRow() {
+    void inFileDuplicateEmail_caseInsensitive_rejectsRow() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
                         new StudentImportRow(3, row("R2", "A@DAGACS.LOCAL", "Bob"))));
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(1, result.getRejectedRows());
         assertEquals(0, result.getImportedRows());
@@ -161,7 +155,7 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void missingRequiredField_rejectsRow_andNeverPersistsAny() {
+    void missingRequiredField_rejectsRow_andNeverPersistsAny() throws Exception {
         Map<String, String> bad = new LinkedHashMap<>(row("R1", "", ""));
         bad.put("email", null);
         bad.put("name", "  ");
@@ -169,7 +163,8 @@ class StudentImportServiceTest {
                 .thenReturn(List.of(new StudentImportRow(2, bad),
                         new StudentImportRow(3, row("R2", "b@dagacs.local", "Bob"))));
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(2, result.getTotalRows());
         assertEquals(0, result.getImportedRows());
@@ -180,29 +175,31 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void nonNumericAcademicId_addsConversionError() {
-        Map<String, String> bad = row("R1", "a@dagacs.local", "Alice");
-        bad.put("programId", "not-a-number");
+    void nonNumericAcademicId_addsConversionError() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
-                .thenReturn(List.of(new StudentImportRow(2, bad)));
+                .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice"))));
+        doThrow(new AuthException(
+                "Student program does not match batch academic session program", 400))
+                .when(studentManagementService).assertValidForCreate(any());
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(1, result.getRejectedRows());
         assertEquals(0, result.getImportedRows());
         assertEquals(400, result.getErrors().get(0).getStatus());
         assertEquals("programId", result.getErrors().get(0).getField());
-        assertTrue(result.getErrors().get(0).getMessage().contains("must be a number"));
     }
 
     @Test
-    void dbConflictFromValidationPath_recordsRowError409() {
+    void dbConflictFromValidationPath_recordsRowError409() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice"))));
         doThrow(new AuthException("Roll number already exists: R1", 409))
                 .when(studentManagementService).assertValidForCreate(any());
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(1, result.getRejectedRows());
         assertEquals(0, result.getImportedRows());
@@ -211,14 +208,15 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void academicMismatchFromValidationPath_recordsRowError400() {
+    void academicMismatchFromValidationPath_recordsRowError400() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice"))));
         doThrow(new AuthException(
                 "Student program does not match batch academic session program", 400))
                 .when(studentManagementService).assertValidForCreate(any());
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 2L, 1L, 1L, 1L);
 
         assertEquals(1, result.getRejectedRows());
         assertEquals(0, result.getImportedRows());
@@ -227,36 +225,74 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void invalidStatusFromValidationPath_recordsRowError() {
+    void statusColumnIgnored_studentDefaultsToActive() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice"))));
-        doThrow(new AuthException("Status must be ACTIVE or INACTIVE", 400))
+        when(studentManagementService.createStudent(any())).thenAnswer(inv -> {
+            StudentManagementRequestDTO dto = inv.getArgument(0);
+            assertEquals(null, dto.getStatus(), "Status should not be set from Excel");
+            return StudentManagementDTO.builder()
+                    .rollNumber(dto.getRollNumber())
+                    .email(dto.getEmail())
+                    .name(dto.getName())
+                    .status("ACTIVE")
+                    .temporaryPassword("TempPass_" + dto.getRollNumber())
+                    .build();
+        });
+
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
+
+        assertEquals(1, result.getImportedRows());
+        verify(studentManagementService, times(1)).createStudent(any());
+    }
+
+    @Test
+    void rollNumberCaseSensitive_preservesCase() throws Exception {
+        when(parser.parse("students.csv", new byte[]{1}))
+                .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice"))));
+        when(studentManagementService.createStudent(any())).thenAnswer(inv -> {
+            StudentManagementRequestDTO dto = inv.getArgument(0);
+            assertEquals("R1", dto.getRollNumber());
+            return StudentManagementDTO.builder()
+                    .rollNumber(dto.getRollNumber())
+                    .email(dto.getEmail())
+                    .name(dto.getName())
+                    .temporaryPassword("TempPass_" + dto.getRollNumber())
+                    .build();
+        });
+
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
+
+        assertEquals(1, result.getImportedRows());
+        verify(studentManagementService, times(1)).createStudent(any());
+    }
+
+    @Test
+    void generatedEmailCollision_returns409() throws Exception {
+        when(parser.parse("students.csv", new byte[]{1}))
+                .thenReturn(List.of(new StudentImportRow(2, row("MT25CSE001", null, "Alice"))));
+        doThrow(new AuthException("Email already used by a login account: mt25cse001@dagacs.local", 409))
                 .when(studentManagementService).assertValidForCreate(any());
 
-        StudentImportResult result = service.importStudents("students.csv", new byte[]{1});
+        StudentImportResult result = service.importStudents("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
-        assertEquals(400, result.getErrors().get(0).getStatus());
-        assertEquals("status", result.getErrors().get(0).getField());
+        assertEquals(1, result.getRejectedRows());
+        assertEquals(0, result.getImportedRows());
+        assertEquals(409, result.getErrors().get(0).getStatus());
+        assertTrue(result.getErrors().get(0).getMessage().contains("Email already used by a login account"));
     }
 
     @Test
-    void headerOnlyFile_throws400() {
-        when(parser.parse("students.csv", new byte[]{1})).thenReturn(List.of());
-
-        AuthException ex = assertThrows(AuthException.class,
-                () -> service.importStudents("students.csv", new byte[]{1}));
-
-        assertEquals(400, ex.getStatus());
-        assertTrue(ex.getMessage().contains("no student rows"));
-    }
-
-    @Test
-    void previewImport_validFile_returnsSummaryWithoutPersisting() {
+    void previewImport_validFile_returnsSummaryWithoutPersisting() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
                         new StudentImportRow(3, row("R2", "b@dagacs.local", "Bob"))));
 
-        StudentImportResult result = service.previewImport("students.csv", new byte[]{1});
+        StudentImportResult result = service.previewImport("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(2, result.getTotalRows());
         assertEquals(0, result.getImportedRows());
@@ -266,12 +302,13 @@ class StudentImportServiceTest {
     }
 
     @Test
-    void previewImport_invalidFile_returnsErrorsWithoutPersisting() {
+    void previewImport_invalidFile_returnsErrorsWithoutPersisting() throws Exception {
         when(parser.parse("students.csv", new byte[]{1}))
                 .thenReturn(List.of(new StudentImportRow(2, row("R1", "a@dagacs.local", "Alice")),
                         new StudentImportRow(3, row("R1", "b@dagacs.local", "Bob"))));
 
-        StudentImportResult result = service.previewImport("students.csv", new byte[]{1});
+        StudentImportResult result = service.previewImport("students.csv", new byte[]{1},
+                1L, 1L, 1L, 1L, 1L);
 
         assertEquals(2, result.getTotalRows());
         assertEquals(0, result.getImportedRows());

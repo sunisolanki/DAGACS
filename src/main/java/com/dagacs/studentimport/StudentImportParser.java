@@ -25,11 +25,11 @@ import java.util.Set;
 public class StudentImportParser {
 
     public static final List<String> REQUIRED_COLUMNS = List.of(
-            "name", "rollNumber", "academicSession", "program");
+            "name", "rollNumber");
 
     public static final List<String> OPTIONAL_COLUMNS = List.of(
             "email", "gender", "fatherName", "motherName", "photoUrl",
-            "enrollmentNumber", "age", "admissionDate", "status",
+            "enrollmentNumber", "age", "admissionDate",
             "batch", "section", "semester");
 
     private static final Map<String, String> HEADER_ALIASES = buildAliases();
@@ -155,8 +155,7 @@ public class StudentImportParser {
             }
             String key = HEADER_ALIASES.get(normalizeHeader(raw));
             if (key == null) {
-                throw new AuthException(
-                        "Unknown column '" + raw + "'. Expected columns: " + expectedColumns(), 400);
+                continue;
             }
             if (!seen.add(key)) {
                 throw new AuthException("Duplicate column '" + raw + "' in the header", 400);
@@ -179,8 +178,7 @@ public class StudentImportParser {
             }
             String key = HEADER_ALIASES.get(normalizeHeader(raw));
             if (key == null) {
-                throw new AuthException(
-                        "Unknown column '" + raw + "'. Expected columns: " + expectedColumns(), 400);
+                continue;
             }
             if (!seen.add(key)) {
                 throw new AuthException("Duplicate column '" + raw + "' in the header", 400);
@@ -252,7 +250,6 @@ public class StudentImportParser {
         aliases.put("enrollmentnumber", "enrollmentNumber");
         aliases.put("age", "age");
         aliases.put("admissiondate", "admissionDate");
-        aliases.put("status", "status");
         aliases.put("academicsession", "academicSession");
         aliases.put("program", "program");
         aliases.put("batch", "batch");

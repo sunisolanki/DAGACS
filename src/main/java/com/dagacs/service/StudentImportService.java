@@ -3,10 +3,6 @@ package com.dagacs.service;
 import com.dagacs.dto.StudentImportResult;
 import com.dagacs.dto.StudentManagementDTO;
 import com.dagacs.dto.StudentManagementRequestDTO;
-import com.dagacs.entity.AcademicSession;
-import com.dagacs.entity.Batch;
-import com.dagacs.entity.Program;
-import com.dagacs.entity.Section;
 import com.dagacs.exception.AuthException;
 import com.dagacs.studentimport.StudentImportParser;
 import com.dagacs.studentimport.StudentImportParser.StudentImportRow;
@@ -48,20 +44,24 @@ public class StudentImportService {
     }
 
     @Transactional(readOnly = true)
-    public StudentImportResult previewImport(String filename, byte[] bytes) {
-        return validateImport(filename, bytes);
+    public StudentImportResult previewImport(String filename, byte[] bytes,
+                                             Long academicSessionId, Long programId,
+                                             Long batchId, Long sectionId, Long semesterId) {
+        return validateImport(filename, bytes, academicSessionId, programId, batchId, sectionId, semesterId);
     }
 
     @Transactional
-    public StudentImportResult importStudents(String filename, byte[] bytes) {
-        StudentImportResult preview = validateImport(filename, bytes);
+    public StudentImportResult importStudents(String filename, byte[] bytes,
+                                              Long academicSessionId, Long programId,
+                                              Long batchId, Long sectionId, Long semesterId) {
+        StudentImportResult preview = validateImport(filename, bytes, academicSessionId, programId, batchId, sectionId, semesterId);
         if (preview.getRejectedRows() > 0) {
             return preview;
         }
 
         List<StudentImportRow> rows = parser.parse(filename, bytes);
         List<StudentManagementRequestDTO> validRows = preview.getErrors().isEmpty()
-                ? buildValidRows(rows)
+                ? buildValidRows(rows, academicSessionId, programId, batchId, sectionId, semesterId)
                 : new ArrayList<>();
 
         int totalRows = rows.size();
@@ -96,7 +96,9 @@ public class StudentImportService {
     }
 
     @Transactional(readOnly = true)
-    private StudentImportResult validateImport(String filename, byte[] bytes) {
+    private StudentImportResult validateImport(String filename, byte[] bytes,
+                                               Long academicSessionId, Long programId,
+                                               Long batchId, Long sectionId, Long semesterId) {
         List<StudentImportRow> rows = parser.parse(filename, bytes);
         if (rows.isEmpty()) {
             throw new AuthException(
@@ -113,7 +115,8 @@ public class StudentImportService {
             Map<String, String> row = entry.values();
             int errorsBefore = errors.size();
 
-            StudentManagementRequestDTO dto = buildDto(row, errors, rowNumber);
+            StudentManagementRequestDTO dto = buildDto(row, errors, rowNumber,
+                    academicSessionId, programId, batchId, sectionId, semesterId);
 
             for (ConstraintViolation<StudentManagementRequestDTO> violation
                     : validator.validate(dto)) {
@@ -167,11 +170,14 @@ public class StudentImportService {
                 .build();
     }
 
-    private List<StudentManagementRequestDTO> buildValidRows(List<StudentImportRow> rows) {
+    private List<StudentManagementRequestDTO> buildValidRows(List<StudentImportRow> rows,
+                                                              Long academicSessionId, Long programId,
+                                                              Long batchId, Long sectionId, Long semesterId) {
         List<StudentManagementRequestDTO> validRows = new ArrayList<>();
         for (StudentImportRow entry : rows) {
             Map<String, String> row = entry.values();
-            StudentManagementRequestDTO dto = buildDto(row, new ArrayList<>(), entry.rowNumber());
+            StudentManagementRequestDTO dto = buildDto(row, new ArrayList<>(), entry.rowNumber(),
+                    academicSessionId, programId, batchId, sectionId, semesterId);
             validRows.add(dto);
         }
         return validRows;
@@ -246,12 +252,9 @@ public class StudentImportService {
 
     private StudentManagementRequestDTO buildDto(Map<String, String> row,
                                                         List<StudentImportResult.RowError> errors,
-                                                        int rowNumber) {
-        String academicSessionName = trim(row.get("academicSession"));
-        String programName = trim(row.get("program"));
-        String batchName = trim(row.get("batch"));
-        String sectionName = trim(row.get("section"));
-        String semesterName = trim(row.get("semester"));
+                                                        int rowNumber,
+                                                        Long academicSessionId, Long programId,
+                                                        Long batchId, Long sectionId, Long semesterId) {
 
         String roll = trim(row.get("rollNumber"));
         String email = trim(row.get("email"));
@@ -280,16 +283,11 @@ public class StudentImportService {
                 .enrollmentNumber(enrollmentNumber)
                 .age(parseOptionalInteger(row.get("age"), errors, rowNumber))
                 .admissionDate(trim(row.get("admissionDate")))
-                .status(trim(row.get("status")))
-                .academicSession(academicSessionName)
-                .program(programName)
-                .batch(batchName)
-                .section(sectionName)
-                .semester(semesterName)
-                .academicSessionId(parseOptionalId(row.get("academicSessionId"), errors, rowNumber, "academicSessionId"))
-                .programId(parseOptionalId(row.get("programId"), errors, rowNumber, "programId"))
-                .batchId(parseOptionalId(row.get("batchId"), errors, rowNumber, "batchId"))
-                .sectionId(parseOptionalId(row.get("sectionId"), errors, rowNumber, "sectionId"))
+                .academicSessionId(academicSessionId)
+                .programId(programId)
+                .batchId(batchId)
+                .sectionId(sectionId)
+                .semesterId(semesterId)
                 .build();
 
         return dto;

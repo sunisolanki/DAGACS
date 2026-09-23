@@ -4,6 +4,7 @@ import com.dagacs.entity.AcademicSession;
 import com.dagacs.entity.Batch;
 import com.dagacs.entity.Department;
 import com.dagacs.entity.Program;
+import com.dagacs.entity.Role;
 import com.dagacs.entity.Section;
 import com.dagacs.entity.Semester;
 import com.dagacs.entity.User;
@@ -11,6 +12,7 @@ import com.dagacs.repository.AcademicSessionRepository;
 import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.DepartmentRepository;
 import com.dagacs.repository.ProgramRepository;
+import com.dagacs.repository.RoleRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.SemesterRepository;
 import com.dagacs.repository.StudentManagementRepository;
@@ -35,70 +37,41 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * M9.10 true end-to-end bulk import coverage through the real ADMIN JWT login
- * and the multipart controller path ({@code POST /api/admin/students/import}).
- * <p>
- * Every case exercises the full stack: multipart parsing, XLSX/CSV parsing,
- * Bean Validation on the frozen DTO, the shared M5.2 validation path (including
- * the M9.9 academic-consistency guard), all-or-nothing rollback, HTTP
- * semantics (200/400/401/403/409) and the SOW summary shape.
- * </p>
- * <p>
- * All reference data and students are created inside the test transaction and
- * rolled back, so nothing production/demo is written.
- * </p>
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 @Rollback
 class StudentImportIntegrationTest {
 
-    private static final String HEADER = "Name,Roll Number,Academic Session,Program,Email,Gender,Father Name,"
-            + "Mother Name,Photo URL,Enrollment Number,Age,Admission Date,Status,Batch,Section";
+    private static final String HEADER = "Name,Roll Number,Email,Gender,Father Name,"
+            + "Mother Name,Photo URL,Enrollment Number,Age,Admission Date,Batch,Section";
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private DepartmentRepository departmentRepository;
+    @Autowired private ProgramRepository programRepository;
+    @Autowired private AcademicSessionRepository academicSessionRepository;
+    @Autowired private BatchRepository batchRepository;
+    @Autowired private SectionRepository sectionRepository;
+    @Autowired private SemesterRepository semesterRepository;
+    @Autowired private StudentManagementRepository studentManagementRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private RoleRepository roleRepository;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private DepartmentRepository departmentRepository;
-
-    @Autowired
-    private ProgramRepository programRepository;
-
-    @Autowired
-    private AcademicSessionRepository academicSessionRepository;
-
-    @Autowired
-    private BatchRepository batchRepository;
-
-    @Autowired
-    private SectionRepository sectionRepository;
-
-    @Autowired
-    private SemesterRepository semesterRepository;
-
-    @Autowired
-    private StudentManagementRepository studentManagementRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private Long fSessionId, fProgramId, fBatchId, fSectionId, fSemesterId;
 
     private String login(String email, String rawPassword) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
@@ -153,8 +126,15 @@ class StudentImportIntegrationTest {
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
     }
 
-private long createStudentOnAnotherProgram(String token, Section section,
-                                                String rollNumber, String email) throws Exception {
+    private Semester createSemester(AcademicSession session, String name, String code) {
+        return semesterRepository.save(Semester.builder()
+                .name(name).code(code).year(1)
+                .academicSession(session)
+                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
+    }
+
+    private long createStudentOnAnotherProgram(String token, Section section,
+                                               String rollNumber, String email) throws Exception {
         String body = "{"
                 + "\"rollNumber\":\"" + rollNumber + "\","
                 + "\"email\":\"" + email + "\","
@@ -179,9 +159,16 @@ private long createStudentOnAnotherProgram(String token, Section section,
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
-    private MvcResult upload(String token, String filename, String contentType, byte[] bytes)
-            throws Exception {
-        return mockMvc.perform(multipart("/api/admin/students/import")
+    private MvcResult upload(String token, String filename, String contentType, byte[] bytes,
+                             Long academicSessionId, Long programId, Long batchId,
+                             Long sectionId, Long semesterId) throws Exception {
+        String path = "/api/admin/students/import"
+                + "?academicSessionId=" + academicSessionId
+                + "&programId=" + programId
+                + "&batchId=" + batchId
+                + "&sectionId=" + sectionId
+                + "&semesterId=" + semesterId;
+        return mockMvc.perform(multipart(path)
                         .file(new MockMultipartFile("file", filename, contentType, bytes))
                         .header("Authorization", "Bearer " + token))
                 .andReturn();
@@ -193,10 +180,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] xlsx = xlsx(
-                new String[]{"Aarav Sharma","IMPR1","SessY","Computer Science Y","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","ACTIVE","B-Y","A"},
-                new String[]{"Priya Patel","IMPR2","SessY","Computer Science Y","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","INACTIVE","B-Y","A"});
+                new String[]{"Aarav Sharma","IMPR1","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","B-Y","A"},
+                new String[]{"Priya Patel","IMPR2","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","B-Y","A"});
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 xlsx))
@@ -216,10 +203,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] xlsx = xlsx(
-                new String[]{"Mia Kapoor","MATCH1","SessY","Computer Science Y","match1@dagacs.local","F","","","","MATCH1","20","2026-01-01","ACTIVE","B-Y","A"},
-                new String[]{"Arjun Rao","MATCH2","SessY","Computer Science Y","match2@dagacs.local","M","","","","MATCH2","21","2026-01-01","ACTIVE","B-Y","A"});
+                new String[]{"Mia Kapoor","MATCH1","match1@dagacs.local","F","","","","MATCH1","20","2026-01-01","B-Y","A"},
+                new String[]{"Arjun Rao","MATCH2","match2@dagacs.local","M","","","","MATCH2","21","2026-01-01","B-Y","A"});
 
-        MvcResult importResult = mockMvc.perform(multipart("/api/admin/students/import")
+        MvcResult importResult = mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 xlsx))
@@ -233,7 +220,6 @@ private long createStudentOnAnotherProgram(String token, Section section,
                 .readTree(importResult.getResponse().getContentAsString())
                 .get("credentialDownloadId").asText();
 
-        // one STUDENT account per imported row, each forcing a password change
         assertTrue(userRepository.existsByEmail("match1@dagacs.local"));
         assertTrue(userRepository.existsByEmail("match2@dagacs.local"));
         User user1 = userRepository.findByEmail("match1@dagacs.local").orElseThrow();
@@ -241,15 +227,13 @@ private long createStudentOnAnotherProgram(String token, Section section,
         assertTrue(user1.isMustChangePassword());
         assertTrue(user2.isMustChangePassword());
 
-        // the downloadable XLSX must contain exactly the passwords that were
-        // persisted as BCrypt hashes
         MvcResult download = mockMvc.perform(get("/api/admin/students/import/credentials/" + downloadId)
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isOk())
                 .andReturn();
         byte[] artifact = download.getResponse().getContentAsByteArray();
 
-        java.util.Map<String, String> passwords = new java.util.LinkedHashMap<>();
+        Map<String, String> passwords = new LinkedHashMap<>();
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(artifact))) {
             Sheet sheet = workbook.getSheetAt(0);
             for (Row row : sheet) {
@@ -265,7 +249,6 @@ private long createStudentOnAnotherProgram(String token, Section section,
         assertTrue(passwordEncoder.matches(passwords.get("MATCH1"), user1.getPassword()));
         assertTrue(passwordEncoder.matches(passwords.get("MATCH2"), user2.getPassword()));
 
-        // and each artifact password actually authenticates
         login("match1@dagacs.local", passwords.get("MATCH1"));
         login("match2@dagacs.local", passwords.get("MATCH2"));
     }
@@ -276,10 +259,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                "Aarav Sharma,IMPC1,SessY,Computer Science Y,impc1@dagacs.local,M,,,,IMPC1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Priya Patel,IMPC2,SessY,Computer Science Y,impc2@dagacs.local,F,,,,IMPC2,21,2026-01-01,ACTIVE,B-Y,A");
+                "Aarav Sharma,IMPC1,impc1@dagacs.local,M,,,,IMPC1,20,2026-01-01,B-Y,A",
+                "Priya Patel,IMPC2,impc2@dagacs.local,F,,,,IMPC2,21,2026-01-01,B-Y,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv",
                                 "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
@@ -298,10 +281,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                "First,DUPR1,SessY,Computer Science Y,dupr1a@dagacs.local,M,,,,DUPR1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Second,DUPR1,SessY,Computer Science Y,dupr1b@dagacs.local,M,,,,DUPR1,20,2026-01-01,ACTIVE,B-Y,A");
+                "First,DUPR1,dupr1a@dagacs.local,M,,,,DUPR1,20,2026-01-01,B-Y,A",
+                "Second,DUPR1,dupr1b@dagacs.local,M,,,,DUPR1,20,2026-01-01,B-Y,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isConflict())
@@ -321,9 +304,9 @@ private long createStudentOnAnotherProgram(String token, Section section,
         createStudentOnAnotherProgram(admin, section, "EXIST1", "shared@dagacs.local");
 
         byte[] csv = csvBody(
-                "New Row,NEWROW,SessY,Computer Science Y,shared@dagacs.local,M,,,,NEWROW,20,2026-01-01,ACTIVE,B-Y,A");
+                "New Row,NEWROW,shared@dagacs.local,M,,,,NEWROW,20,2026-01-01,B-Y,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isConflict())
@@ -348,9 +331,9 @@ private long createStudentOnAnotherProgram(String token, Section section,
         Section sectionCS = createSection(batchCS, "A", "A");
 
         byte[] csv = csvBody(
-                "MISMATCH,MISMATCH,SessCS,Electrical X,mismatch@dagacs.local,M,,,,MISMATCH,20,2026-01-01,ACTIVE,B-CS,A");
+                "MISMATCH,MISMATCH,mismatch@dagacs.local,M,,,,MISMATCH,20,2026-01-01,B-CS,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + sessCS.getId() + "&programId=" + ee.getId() + "&batchId=" + batchCS.getId() + "&sectionId=" + sectionCS.getId() + "&semesterId=1")
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isBadRequest())
@@ -368,10 +351,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] csv = csvBody(
-                ",MISSING1,SessY,Computer Science Y,,M,,,,MISSING1,20,2026-01-01,ACTIVE,B-Y,A",
-                "Valid,MISSING2,SessY,Computer Science Y,missing2@dagacs.local,M,,,,MISSING2,20,2026-01-01,ACTIVE,B-Y,A");
+                ",MISSING1,,M,,,,MISSING1,20,2026-01-01,B-Y,A",
+                "Valid,MISSING2,mising2@dagacs.local,M,,,,MISSING2,20,2026-01-01,B-Y,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isBadRequest())
@@ -391,10 +374,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
         oneSectionFixture();
 
         byte[] xlsx = xlsx(
-                new String[]{"Aarav Sharma","IMPR1","SessY","Computer Science Y","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","ACTIVE","B-Y","A"},
-                new String[]{"Priya Patel","IMPR2","SessY","Computer Science Y","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","INACTIVE","B-Y","A"});
+                new String[]{"Aarav Sharma","IMPR1","impr1@dagacs.local","M","","","","IMPR1","20","2026-01-01","B-Y","A"},
+                new String[]{"Priya Patel","IMPR2","impr2@dagacs.local","F","","","","IMPR2","21","2026-01-01","B-Y","A"});
 
-        mockMvc.perform(multipart("/api/admin/students/import/preview")
+        mockMvc.perform(multipart("/api/admin/students/import/preview?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 xlsx))
@@ -411,31 +394,14 @@ private long createStudentOnAnotherProgram(String token, Section section,
     @Test
     void headerMismatch_returns400() throws Exception {
         String admin = adminToken();
-        byte[] csv = ("Roll Number,Name,Program ID,Batch ID,Section ID\n"
-                + "HDR1,Rahul,1,1,1\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
-        mockMvc.perform(multipart("/api/admin/students/import")
-                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
-                        .header("Authorization", "Bearer " + admin))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void headerAliases_programId_batchId_sectionId_accepted() throws Exception {
-        String admin = adminToken();
         oneSectionFixture();
+        byte[] csv = ("Name\n"
+                + "HDR1\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        byte[] csv = ("Name,Roll Number,Academic Session,Program ID,Batch ID,Section ID\n"
-                + "Rahul,2201CE001,SessY,Computer Science Y,B-Y,A\n")
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalRows").value(1))
-                .andExpect(jsonPath("$.importedRows").value(1));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -443,11 +409,11 @@ private long createStudentOnAnotherProgram(String token, Section section,
         String admin = adminToken();
         oneSectionFixture();
 
-        byte[] csv = ("Name,Roll Number,Academic Session,Program,Batch,Section,Semester\n"
-                + "Rahul,2201CE001,SessY,Computer Science Y,B-Y,A,Sem 1\n")
+        byte[] csv = ("Name,Roll Number,Batch,Section,Semester\n"
+                + "Rahul,2201CE001,B-Y,A,Sem 1\n")
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isOk())
@@ -456,11 +422,82 @@ private long createStudentOnAnotherProgram(String token, Section section,
     }
 
     @Test
+    void generatedEmailCollision_returns409() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+        Role studentRole = roleRepository.findByName("STUDENT").orElseGet(() ->
+                roleRepository.save(Role.builder().name("STUDENT").build()));
+        User existingUser = userRepository.save(User.builder()
+                .email("mt25cse001@dagacs.local")
+                .password(passwordEncoder.encode("TempPass@123"))
+                .fullName("Existing")
+                .phone("")
+                .status("ACTIVE")
+                .role(studentRole)
+                .avatarUrl("")
+                .mustChangePassword(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build());
+
+        byte[] csv = csvBody(
+                "Alice,MT25CSE001,mt25cse001@dagacs.local,M,,,,MT25CSE001,20,2026-01-01,B-Y,A");
+
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
+                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.importedRows").value(0))
+                .andExpect(jsonPath("$.rejectedRows").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("email"));
+
+        assertFalse(studentManagementRepository.existsByRollNumber("MT25CSE001"));
+    }
+
+    @Test
+    void statusColumnIgnored_studentDefaultsToActive() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+
+        byte[] csv = csvBody(
+                "R1,R1,r1@dagacs.local,M,,,,R1,20,2026-01-01,B-Y,A");
+
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
+                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRows").value(1))
+                .andExpect(jsonPath("$.importedRows").value(1));
+
+        assertTrue(studentManagementRepository.existsByRollNumber("R1"));
+    }
+
+    @Test
+    void rollNumberCaseSensitive_preservesCase() throws Exception {
+        String admin = adminToken();
+        oneSectionFixture();
+
+        byte[] csv = csvBody(
+                "Alice,MT25CSE001,alice@dagacs.local,M,,,,MT25CSE001,20,2026-01-01,B-Y,A",
+                "Bob,MT25CSE002,bob@dagacs.local,M,,,,MT25CSE002,20,2026-01-01,B-Y,A");
+
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
+                        .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRows").value(2))
+                .andExpect(jsonPath("$.importedRows").value(2));
+
+        assertTrue(studentManagementRepository.existsByRollNumber("MT25CSE001"));
+        assertTrue(studentManagementRepository.existsByRollNumber("MT25CSE002"));
+    }
+
+    @Test
     void malformedFile_returns400() throws Exception {
         String admin = adminToken();
         byte[] garbage = "this-is-not-a-workbook".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.xlsx",
                                 "application/octet-stream", garbage))
                         .header("Authorization", "Bearer " + admin))
@@ -470,7 +507,7 @@ private long createStudentOnAnotherProgram(String token, Section section,
     @Test
     void emptyFile_returns400() throws Exception {
         String admin = adminToken();
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", new byte[0]))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isBadRequest());
@@ -479,9 +516,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
     @Test
     void headerOnlyFile_returns400() throws Exception {
         String admin = adminToken();
+        oneSectionFixture();
         byte[] csv = (HEADER + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isBadRequest())
@@ -490,9 +528,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
 
     @Test
     void unauthenticated_returns401() throws Exception {
-        byte[] csv = csvBody("A1,,Alice,M,,,,E,20,,ACTIVE,1,1,1");
+        oneSectionFixture();
+        byte[] csv = csvBody("A1,,a@x.com,M,,,,A1,20,2026-01-01,B1,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv)))
                 .andExpect(status().isUnauthorized());
     }
@@ -500,9 +539,10 @@ private long createStudentOnAnotherProgram(String token, Section section,
     @Test
     void nonAdmin_returns403() throws Exception {
         String teacher = teacherToken();
-        byte[] csv = csvBody("A1,,Alice,M,,,,E,20,,ACTIVE,1,1,1");
+        oneSectionFixture();
+        byte[] csv = csvBody("A1,,a@x.com,M,,,,A1,20,2026-01-01,B1,A");
 
-        mockMvc.perform(multipart("/api/admin/students/import")
+        mockMvc.perform(multipart("/api/admin/students/import?academicSessionId=" + fSessionId + "&programId=" + fProgramId + "&batchId=" + fBatchId + "&sectionId=" + fSectionId + "&semesterId=" + fSemesterId)
                         .file(new MockMultipartFile("file", "students.csv", "text/csv", csv))
                         .header("Authorization", "Bearer " + teacher))
                 .andExpect(status().isForbidden());
@@ -512,16 +552,15 @@ private long createStudentOnAnotherProgram(String token, Section section,
         Department dept = createDepartment();
         Program program = createProgram(dept, "Computer Science Y", "CSY");
         AcademicSession session = createSession(program, "SessY");
+        fSessionId = session.getId();
+        fProgramId = program.getId();
         Batch batch = createBatch(session, "B-Y", "BY");
+        fBatchId = batch.getId();
         Semester semester = createSemester(session, "Sem 1", "SEM1");
-        return createSection(batch, "A", "A");
-    }
-
-    private Semester createSemester(AcademicSession session, String name, String code) {
-        return semesterRepository.save(Semester.builder()
-                .name(name).code(code).year(1)
-                .academicSession(session)
-                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
+        fSemesterId = semester.getId();
+        Section section = createSection(batch, "A", "A");
+        fSectionId = section.getId();
+        return section;
     }
 
     private static byte[] csvBody(String... dataRows) {
@@ -549,18 +588,6 @@ private long createStudentOnAnotherProgram(String token, Section section,
             }
             workbook.write(out);
             return out.toByteArray();
-        }
-    }
-
-    private static void assertTrue(boolean condition) {
-        if (!condition) {
-            throw new AssertionError("Expected condition to be true");
-        }
-    }
-
-    private static void assertFalse(boolean condition) {
-        if (condition) {
-            throw new AssertionError("Expected condition to be false");
         }
     }
 }
