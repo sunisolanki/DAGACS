@@ -105,6 +105,7 @@ com\dagacs\service\SemesterService.class
 com\dagacs\dto\HodSectionAttendanceDTO.class
 com\dagacs\exception\GlobalExceptionHandler.class
 com\dagacs\dto\AttendanceUpdateRequestDTO.class
+com\dagacs\dto\StudentProfileRequestDTO$StudentProfileRequestDTOBuilder.class
 com\dagacs\dto\SubjectDTO.class
 com\dagacs\dto\SubjectOfferingDTO.class
 com\dagacs\dto\StudentWiseCellDTO$StudentWiseCellDTOBuilder.class
@@ -279,3 +280,4 @@ com\dagacs\controller\StudentController.class
 com\dagacs\dto\AttendanceMarkRequestDTO$AttendanceMarkRequestDTOBuilder.class
 com\dagacs\config\BatchLevelAttendanceSchemaMigration.class
 com\dagacs\controller\DepartmentController.class
+com\dagacs\dto\StudentProfileRequestDTO.class

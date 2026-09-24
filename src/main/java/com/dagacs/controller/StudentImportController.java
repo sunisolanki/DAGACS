@@ -37,7 +37,7 @@ public class StudentImportController {
             @RequestParam Long academicSessionId,
             @RequestParam Long programId,
             @RequestParam Long batchId,
-            @RequestParam Long sectionId,
+            @RequestParam(required = false) Long sectionId,
             @RequestParam Long semesterId) throws IOException {
         String filename = file.getOriginalFilename();
         StudentImportResult result = studentImportService.importStudents(
@@ -61,7 +61,7 @@ public class StudentImportController {
             @RequestParam Long academicSessionId,
             @RequestParam Long programId,
             @RequestParam Long batchId,
-            @RequestParam Long sectionId,
+            @RequestParam(required = false) Long sectionId,
             @RequestParam Long semesterId) throws IOException {
         String filename = file.getOriginalFilename();
         StudentImportResult result = studentImportService.previewImport(

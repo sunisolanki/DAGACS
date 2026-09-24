@@ -64,6 +64,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\service\StudentManagementService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\config\AttendanceStudentSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentWiseCellDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentWiseRowDTO.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentProfileRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentFilterOptionsResponse.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherUpdateRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectOfferingRequestDTO.java

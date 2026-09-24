@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StudentProfileDTO {
 
+    private String personalEmail;
     private String rollNumber;
     private String enrollmentNumber;
-    private String email;
     private String name;
     private String gender;
     private String fatherName;
@@ -27,3 +27,4 @@ public class StudentProfileDTO {
     private String sectionName;
     private String academicSessionName;
 }
+

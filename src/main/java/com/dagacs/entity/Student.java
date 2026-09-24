@@ -41,6 +41,9 @@ public class Student {
     private String motherName;
 
     @Column(nullable = true)
+    private String personalEmail;
+
+    @Column(nullable = true)
     private String photoUrl;
 
     @Column(nullable = true)
@@ -89,3 +92,5 @@ public class Student {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 }
+
+

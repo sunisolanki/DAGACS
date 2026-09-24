@@ -1,13 +1,18 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.StudentProfileDTO;
+import com.dagacs.dto.StudentProfileRequestDTO;
 import com.dagacs.entity.Student;
+import com.dagacs.repository.StudentRepository;
 import com.dagacs.security.AuthenticatedStudentResolver;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.regex.Pattern;
+
 /**
- * Read-only service exposing the authenticated student's own academic profile.
+ * Student profile API (M5.1).
  * <p>
  * Identity always comes from the JWT security context via
  * {@link AuthenticatedStudentResolver}; the client can never request a profile
@@ -17,10 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StudentProfileService {
 
-    private final AuthenticatedStudentResolver studentResolver;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
 
-    public StudentProfileService(AuthenticatedStudentResolver studentResolver) {
+    private final AuthenticatedStudentResolver studentResolver;
+    private final StudentRepository studentRepository;
+
+    public StudentProfileService(AuthenticatedStudentResolver studentResolver,
+                                 StudentRepository studentRepository) {
         this.studentResolver = studentResolver;
+        this.studentRepository = studentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -29,7 +39,7 @@ public class StudentProfileService {
         return StudentProfileDTO.builder()
                 .rollNumber(student.getRollNumber())
                 .enrollmentNumber(student.getEnrollmentNumber())
-                .email(student.getEmail())
+                .personalEmail(student.getPersonalEmail())
                 .name(student.getName())
                 .gender(student.getGender())
                 .fatherName(student.getFatherName())
@@ -44,4 +54,30 @@ public class StudentProfileService {
                 .academicSessionName(student.getAcademicSession() != null ? student.getAcademicSession().getName() : null)
                 .build();
     }
+
+    @Transactional
+    public StudentProfileDTO updateMyProfile(StudentProfileRequestDTO request) {
+        Student student = studentResolver.resolve();
+        if (request.getFatherName() != null) {
+            student.setFatherName(request.getFatherName().trim());
+        }
+        if (request.getMotherName() != null) {
+            student.setMotherName(request.getMotherName().trim());
+        }
+        if (request.getGender() != null) {
+            student.setGender(request.getGender().trim());
+        }
+        if (request.getPersonalEmail() != null) {
+            String email = request.getPersonalEmail().trim();
+            if (email.isEmpty()) {
+                student.setPersonalEmail(null);
+            } else if (EMAIL_PATTERN.matcher(email).matches()) {
+                student.setPersonalEmail(email);
+            }
+        }
+        student.setUpdatedAt(LocalDateTime.now());
+        student = studentRepository.save(student);
+        return getMyProfile();
+    }
 }
+
