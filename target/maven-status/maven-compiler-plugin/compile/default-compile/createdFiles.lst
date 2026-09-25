@@ -48,6 +48,7 @@ com\dagacs\dto\HodStudentAttendanceDTO.class
 com\dagacs\dto\TeacherSubjectReportDTO.class
 com\dagacs\repository\HodReportRepository$HodDailyLectureAggregation.class
 com\dagacs\dto\TeacherLoginRequestDTO$TeacherLoginRequestDTOBuilder.class
+com\dagacs\dto\CalendarAttendanceDTO$CalendarAttendanceDTOBuilder.class
 com\dagacs\dto\HodSubjectAttendanceDTO$HodSubjectAttendanceDTOBuilder.class
 com\dagacs\config\DataInitializer.class
 com\dagacs\repository\TeacherStudentWiseReportRepository$StudentWiseRecordAggregation.class
@@ -82,6 +83,7 @@ com\dagacs\dto\AttendancePercentageDTO$AttendancePercentageDTOBuilder.class
 com\dagacs\dto\AttendanceUpdateRequestDTO$AttendanceUpdateRequestDTOBuilder.class
 com\dagacs\service\SubjectService.class
 com\dagacs\service\AttendanceService.class
+com\dagacs\dto\CalendarAttendanceDTO.class
 com\dagacs\repository\TeacherStudentWiseReportRepository.class
 com\dagacs\dto\HodDashboardDTO$HodDashboardDTOBuilder.class
 com\dagacs\dto\StudentStatusDTO$StudentStatusDTOBuilder.class
@@ -133,6 +135,7 @@ com\dagacs\repository\HodAnalyticsRepository$SectionAggregation.class
 com\dagacs\dto\BatchDTO.class
 com\dagacs\repository\TeacherSubjectSectionAssignmentRepository.class
 com\dagacs\entity\Student$StudentBuilder.class
+com\dagacs\dto\SubjectAttendanceDTO$SubjectAttendanceDTOBuilder.class
 com\dagacs\dto\AttendanceSessionCreateRequestDTO.class
 com\dagacs\validation\ValidAttendanceDate.class
 com\dagacs\repository\AttendanceSessionRepository.class
@@ -231,6 +234,7 @@ com\dagacs\controller\SemesterController.class
 com\dagacs\service\HodIdentityService.class
 com\dagacs\dto\StudentPasswordUpdateRequestDTO.class
 com\dagacs\export\ExcelReportGenerator.class
+com\dagacs\dto\SubjectAttendanceDTO.class
 com\dagacs\service\TeacherAssignmentService.class
 com\dagacs\security\AuthenticatedStudentResolver.class
 com\dagacs\security\LoginRateLimitFilter$ReplayableServletInputStream.class

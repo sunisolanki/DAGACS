@@ -1,6 +1,8 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.AttendancePercentageDTO;
+import com.dagacs.dto.CalendarAttendanceDTO;
+import com.dagacs.dto.SubjectAttendanceDTO;
 import com.dagacs.entity.Student;
 import com.dagacs.exception.InvalidDateRangeException;
 import com.dagacs.repository.AttendanceRecordAggregationRepository;
@@ -9,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AttendanceCalculationService {
@@ -74,6 +78,32 @@ public class AttendanceCalculationService {
         return buildDTO(presentCount, totalRecorded);
     }
 
+    @Transactional(readOnly = true)
+    public List<SubjectAttendanceDTO> getSubjectSummaries(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        Student student = studentResolver.resolve();
+        Long studentId = student.getId();
+
+        String start = toCanonicalString(startDate);
+        String end = toCanonicalString(endDate);
+
+        List<Object[]> results = aggregationRepository.summarizeByStudentAndSubjectGrouped(studentId, start, end);
+        return results.stream().map(this::buildSubjectDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarAttendanceDTO> getCalendarSummary(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        Student student = studentResolver.resolve();
+        Long studentId = student.getId();
+
+        String start = toCanonicalString(startDate);
+        String end = toCanonicalString(endDate);
+
+        List<Object[]> results = aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(studentId, start, end);
+        return results.stream().map(this::buildCalendarDTO).collect(Collectors.toList());
+    }
+
     private static String toCanonicalString(LocalDate date) {
         return date == null ? null : date.toString();
     }
@@ -82,6 +112,42 @@ public class AttendanceCalculationService {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new InvalidDateRangeException("startDate must not be after endDate");
         }
+    }
+
+    private SubjectAttendanceDTO buildSubjectDTO(Object[] result) {
+        Long subjectId = (Long) result[0];
+        String subjectName = result[1] != null ? result[1].toString() : "";
+        Long presentCount = ((Number) result[2]).longValue();
+        Long totalRecordedCount = ((Number) result[3]).longValue();
+        Double percentage = null;
+        if (totalRecordedCount > 0) {
+            percentage = (double) presentCount / totalRecordedCount * 100.0;
+        }
+        return SubjectAttendanceDTO.builder()
+                .subjectId(subjectId)
+                .subjectName(subjectName)
+                .presentCount(presentCount)
+                .totalRecordedCount(totalRecordedCount)
+                .percentage(percentage)
+                .build();
+    }
+
+    private CalendarAttendanceDTO buildCalendarDTO(Object[] result) {
+        String date = result[0] != null ? result[0].toString() : "";
+        Long presentCount = ((Number) result[1]).longValue();
+        Long absentCount = ((Number) result[2]).longValue();
+        Long totalRecordedCount = ((Number) result[3]).longValue();
+        Double percentage = null;
+        if (totalRecordedCount > 0) {
+            percentage = (double) presentCount / totalRecordedCount * 100.0;
+        }
+        return CalendarAttendanceDTO.builder()
+                .date(date)
+                .presentCount(presentCount)
+                .absentCount(absentCount)
+                .totalRecordedCount(totalRecordedCount)
+                .percentage(percentage)
+                .build();
     }
 
     private AttendancePercentageDTO buildDTO(long presentCount, long totalRecorded) {

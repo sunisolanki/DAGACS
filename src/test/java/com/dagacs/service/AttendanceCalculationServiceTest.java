@@ -1,6 +1,8 @@
 package com.dagacs.service;
 
 import com.dagacs.dto.AttendancePercentageDTO;
+import com.dagacs.dto.CalendarAttendanceDTO;
+import com.dagacs.dto.SubjectAttendanceDTO;
 import com.dagacs.entity.AttendanceRecord;
 import com.dagacs.entity.AttendanceSession;
 import com.dagacs.entity.Subject;
@@ -16,6 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -286,5 +290,142 @@ class AttendanceCalculationServiceTest {
         assertEquals(1L, result.getPresentCount());
         assertEquals(2L, result.getTotalRecordedCount());
         assertEquals(50.0, result.getPercentage());
+    }
+
+    @Test
+    void getSubjectSummaries_returnsAllSubjects() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.summarizeByStudentAndSubjectGrouped(1L, null, null))
+                .thenReturn(Arrays.asList(
+                        new Object[]{5L, "Database Systems", 8L, 10L},
+                        new Object[]{6L, "Operating Systems", 7L, 10L}
+                ));
+
+        List<SubjectAttendanceDTO> result = calculationService.getSubjectSummaries(null, null);
+
+        assertEquals(2, result.size());
+        assertEquals(5L, result.get(0).getSubjectId());
+        assertEquals("Database Systems", result.get(0).getSubjectName());
+        assertEquals(8L, result.get(0).getPresentCount());
+        assertEquals(10L, result.get(0).getTotalRecordedCount());
+        assertEquals(80.0, result.get(0).getPercentage());
+        assertEquals(6L, result.get(1).getSubjectId());
+        assertEquals(70.0, result.get(1).getPercentage());
+    }
+
+    @Test
+    void getSubjectSummaries_zeroRecords_returnsEmptyList() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.summarizeByStudentAndSubjectGrouped(1L, null, null))
+                .thenReturn(Collections.emptyList());
+
+        List<SubjectAttendanceDTO> result = calculationService.getSubjectSummaries(null, null);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getSubjectSummaries_usesAuthenticatedStudentOnly() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.summarizeByStudentAndSubjectGrouped(1L, null, null))
+                .thenReturn(Collections.emptyList());
+
+        calculationService.getSubjectSummaries(null, null);
+
+        verify(aggregationRepository).summarizeByStudentAndSubjectGrouped(1L, null, null);
+        verify(aggregationRepository, never()).summarizeByStudentAndSubjectGrouped(2L, null, null);
+    }
+
+    @Test
+    void getSubjectSummaries_subjectNameNull_defaultsToEmptyString() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.summarizeByStudentAndSubjectGrouped(1L, null, null))
+                .thenReturn(Collections.singletonList(new Object[]{5L, null, 8L, 10L}));
+
+        List<SubjectAttendanceDTO> result = calculationService.getSubjectSummaries(null, null);
+
+        assertEquals(1, result.size());
+        assertEquals("", result.get(0).getSubjectName());
+    }
+
+    @Test
+    void getCalendarSummary_multipleDates() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, null, null))
+                .thenReturn(Arrays.asList(
+                        new Object[]{"2026-09-01", 5L, 0L, 5L},
+                        new Object[]{"2026-09-04", 3L, 2L, 5L}
+                ));
+
+        List<CalendarAttendanceDTO> result = calculationService.getCalendarSummary(null, null);
+
+        assertEquals(2, result.size());
+        assertEquals("2026-09-01", result.get(0).getDate());
+        assertEquals(5L, result.get(0).getPresentCount());
+        assertEquals(0L, result.get(0).getAbsentCount());
+        assertEquals(5L, result.get(0).getTotalRecordedCount());
+        assertEquals(100.0, result.get(0).getPercentage());
+        assertEquals("2026-09-04", result.get(1).getDate());
+        assertEquals(3L, result.get(1).getPresentCount());
+        assertEquals(2L, result.get(1).getAbsentCount());
+        assertEquals(60.0, result.get(1).getPercentage());
+    }
+
+    @Test
+    void getCalendarSummary_includesAbsentCounts() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, null, null))
+                .thenReturn(Collections.singletonList(new Object[]{"2026-09-04", 3L, 2L, 5L}));
+
+        List<CalendarAttendanceDTO> result = calculationService.getCalendarSummary(null, null);
+
+        assertEquals(1, result.size());
+        assertEquals(3L, result.get(0).getPresentCount());
+        assertEquals(2L, result.get(0).getAbsentCount());
+        assertEquals(5L, result.get(0).getTotalRecordedCount());
+    }
+
+    @Test
+    void getCalendarSummary_dateRangeFilter() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, "2026-09-01", "2026-09-30"))
+                .thenReturn(Collections.singletonList(new Object[]{"2026-09-04", 3L, 1L, 4L}));
+
+        List<CalendarAttendanceDTO> result = calculationService.getCalendarSummary(
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+
+        assertEquals(1, result.size());
+        assertEquals("2026-09-04", result.get(0).getDate());
+        verify(aggregationRepository).countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, "2026-09-01", "2026-09-30");
+    }
+
+    @Test
+    void getCalendarSummary_zeroRecords_returnsEmptyList() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, null, null))
+                .thenReturn(Collections.emptyList());
+
+        List<CalendarAttendanceDTO> result = calculationService.getCalendarSummary(null, null);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getCalendarSummary_startAfterEnd_throwsInvalidDateRange() {
+        assertThrows(InvalidDateRangeException.class,
+                () -> calculationService.getCalendarSummary(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1)));
+        verify(aggregationRepository, never()).countPresentAbsentTotalByStudentAndDateRangeGrouped(any(), any(), any());
+    }
+
+    @Test
+    void getCalendarSummary_withNullNull_returnsAll() {
+        when(studentResolver.resolve()).thenReturn(student);
+        when(aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, null, null))
+                .thenReturn(Collections.singletonList(new Object[]{"2026-09-04", 3L, 1L, 4L}));
+
+        List<CalendarAttendanceDTO> result = calculationService.getCalendarSummary(null, null);
+
+        assertEquals(1, result.size());
+        verify(aggregationRepository).countPresentAbsentTotalByStudentAndDateRangeGrouped(1L, null, null);
     }
 }

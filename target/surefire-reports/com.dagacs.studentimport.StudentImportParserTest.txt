@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.studentimport.StudentImportParserTest
 -------------------------------------------------------------------------------
-Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.061 s -- in com.dagacs.studentimport.StudentImportParserTest
+Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.051 s -- in com.dagacs.studentimport.StudentImportParserTest

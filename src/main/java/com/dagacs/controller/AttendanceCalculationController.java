@@ -1,6 +1,8 @@
 package com.dagacs.controller;
 
 import com.dagacs.dto.AttendancePercentageDTO;
+import com.dagacs.dto.CalendarAttendanceDTO;
+import com.dagacs.dto.SubjectAttendanceDTO;
 import com.dagacs.service.AttendanceCalculationService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Read-only attendance calculation API for students.
@@ -48,5 +51,23 @@ public class AttendanceCalculationController {
             @RequestParam(name = "endDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(calculationService.getOverallCalculation(startDate, endDate));
+    }
+
+    @GetMapping("/subjects")
+    public ResponseEntity<List<SubjectAttendanceDTO>> getSubjectSummaries(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(calculationService.getSubjectSummaries(startDate, endDate));
+    }
+
+    @GetMapping("/calendar")
+    public ResponseEntity<List<CalendarAttendanceDTO>> getCalendarSummary(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(calculationService.getCalendarSummary(startDate, endDate));
     }
 }

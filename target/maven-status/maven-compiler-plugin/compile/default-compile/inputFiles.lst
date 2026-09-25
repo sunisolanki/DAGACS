@@ -19,6 +19,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\repository\UserRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\config\TeacherHodSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\AcademicSession.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\SubjectController.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectAttendanceDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\DepartmentDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\ExcelReportGenerator.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\ExportData.java
@@ -141,6 +142,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\repository\HodAnalyticsRepository.jav
 D:\DAGACS\backend\src\main\java\com\dagacs\config\AuditLogReasonSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\TeacherSubjectReportDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\security\JwtTokenProvider.java
+D:\DAGACS\backend\src\main\java\com\dagacs\dto\CalendarAttendanceDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\TeacherReportRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\security\AuthenticatedStudentResolver.java
 D:\DAGACS\backend\src\main\java\com\dagacs\validation\ValidAttendanceDate.java

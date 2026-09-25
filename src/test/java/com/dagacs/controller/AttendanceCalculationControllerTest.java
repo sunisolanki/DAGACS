@@ -1,6 +1,8 @@
 package com.dagacs.controller;
 
 import com.dagacs.dto.AttendancePercentageDTO;
+import com.dagacs.dto.CalendarAttendanceDTO;
+import com.dagacs.dto.SubjectAttendanceDTO;
 import com.dagacs.exception.InvalidDateRangeException;
 import com.dagacs.service.AttendanceCalculationService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -217,5 +221,156 @@ class AttendanceCalculationControllerTest {
         mockMvc.perform(get("/api/student/attendance/calculation/subject/5")
                         .param("endDate", "31-01-2026"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ── GET /subjects ────────────────────────────────────────
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getSubjectSummaries_student_returns200() throws Exception {
+        when(calculationService.getSubjectSummaries(null, null))
+                .thenReturn(Arrays.asList(
+                        SubjectAttendanceDTO.builder().subjectId(5L).subjectName("DS").presentCount(8L).totalRecordedCount(10L).percentage(80.0).build(),
+                        SubjectAttendanceDTO.builder().subjectId(6L).subjectName("OS").presentCount(7L).totalRecordedCount(10L).percentage(70.0).build()
+                ));
+
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].subjectId").value(5))
+                .andExpect(jsonPath("$[0].subjectName").value("DS"))
+                .andExpect(jsonPath("$[0].presentCount").value(8))
+                .andExpect(jsonPath("$[0].percentage").value(80.0));
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getSubjectSummaries_zeroRecords_returnsEmptyArray() throws Exception {
+        when(calculationService.getSubjectSummaries(null, null))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void getSubjectSummaries_noAuth_returns401() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    void getSubjectSummaries_teacherDenied_returns403() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "HOD")
+    void getSubjectSummaries_hodDenied_returns403() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getSubjectSummaries_withDateRange_returns200() throws Exception {
+        when(calculationService.getSubjectSummaries(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/student/attendance/calculation/subjects")
+                        .param("startDate", "2026-01-01")
+                        .param("endDate", "2026-01-31"))
+                .andExpect(status().isOk());
+    }
+
+    // ── GET /calendar ────────────────────────────────────────
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getCalendarSummary_student_returns200() throws Exception {
+        when(calculationService.getCalendarSummary(null, null))
+                .thenReturn(Arrays.asList(
+                        CalendarAttendanceDTO.builder().date("2026-09-01").presentCount(5L).absentCount(0L).totalRecordedCount(5L).percentage(100.0).build(),
+                        CalendarAttendanceDTO.builder().date("2026-09-04").presentCount(3L).absentCount(2L).totalRecordedCount(5L).percentage(60.0).build()
+                ));
+
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].date").value("2026-09-01"))
+                .andExpect(jsonPath("$[0].presentCount").value(5))
+                .andExpect(jsonPath("$[0].absentCount").value(0))
+                .andExpect(jsonPath("$[0].percentage").value(100.0));
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getCalendarSummary_zeroRecords_returnsEmptyArray() throws Exception {
+        when(calculationService.getCalendarSummary(null, null))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void getCalendarSummary_noAuth_returns401() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    void getCalendarSummary_teacherDenied_returns403() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getCalendarSummary_adminDenied_returns403() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "HOD")
+    void getCalendarSummary_hodDenied_returns403() throws Exception {
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getCalendarSummary_withDateRange_returns200() throws Exception {
+        when(calculationService.getCalendarSummary(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar")
+                        .param("startDate", "2026-01-01")
+                        .param("endDate", "2026-01-31"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void getCalendarSummary_includesAbsentCounts() throws Exception {
+        when(calculationService.getCalendarSummary(null, null))
+                .thenReturn(Arrays.asList(
+                        CalendarAttendanceDTO.builder().date("2026-09-04").presentCount(3L).absentCount(2L).totalRecordedCount(5L).percentage(60.0).build()
+                ));
+
+        mockMvc.perform(get("/api/student/attendance/calculation/calendar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].absentCount").value(2))
+                .andExpect(jsonPath("$[0].presentCount").value(3));
     }
 }

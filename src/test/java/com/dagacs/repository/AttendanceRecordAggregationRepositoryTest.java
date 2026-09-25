@@ -8,9 +8,11 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @Transactional
@@ -314,7 +316,7 @@ class AttendanceRecordAggregationRepositoryTest {
         assertEquals(1L, aggregationRepository.countPresentByStudentAndSubjectAndDateRange(student.getId(), subjectY.getId(), null, null));
     }
 
-    @Test
+@Test
     void countByStudentAndDateRange_filteredFromAnotherStudentsRecords() {
         Section section = createTestSection();
         Student studentA = createTestStudent(section);
@@ -326,10 +328,123 @@ class AttendanceRecordAggregationRepositoryTest {
         saveRecord(studentA, subject, section, teacher, false, "2026-09-10");
         saveRecord(studentB, subject, section, teacher, true, "2026-09-04");
 
-        // Student B's record is excluded even when inside the range
         assertEquals(2L, aggregationRepository.countRecordedByStudentAndDateRange(studentA.getId(), "2026-09-01", "2026-09-10"));
         assertEquals(1L, aggregationRepository.countPresentByStudentAndDateRange(studentA.getId(), "2026-09-01", "2026-09-10"));
         assertEquals(1L, aggregationRepository.countRecordedByStudentAndDateRange(studentB.getId(), "2026-09-01", "2026-09-10"));
         assertEquals(1L, aggregationRepository.countPresentByStudentAndDateRange(studentB.getId(), "2026-09-01", "2026-09-10"));
+    }
+
+    @Test
+    void countPresentAbsentTotalByStudentAndDateRangeGrouped_returnsGroupedResults() {
+        Section section = createTestSection();
+        Student student = createTestStudent(section);
+        Subject subject = createTestSubject();
+        Teacher teacher = createTestTeacher();
+
+        saveRecord(student, subject, section, teacher, true, "2026-09-01");
+        saveRecord(student, subject, section, teacher, true, "2026-09-04");
+        saveRecord(student, subject, section, teacher, false, "2026-09-10");
+
+        List<Object[]> results = aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(student.getId(), null, null);
+
+        assertEquals(3, results.size());
+        Object[] sep01 = results.stream().filter(r -> r[0].toString().equals("2026-09-01")).findFirst().orElse(null);
+        assertNotNull(sep01);
+        assertEquals(1L, ((Number) sep01[1]).longValue());
+        assertEquals(0L, ((Number) sep01[2]).longValue());
+        assertEquals(1L, ((Number) sep01[3]).longValue());
+        Object[] sep04 = results.stream().filter(r -> r[0].toString().equals("2026-09-04")).findFirst().orElse(null);
+        assertNotNull(sep04);
+        assertEquals(1L, ((Number) sep04[1]).longValue());
+        assertEquals(0L, ((Number) sep04[2]).longValue());
+        assertEquals(1L, ((Number) sep04[3]).longValue());
+        Object[] sep10 = results.stream().filter(r -> r[0].toString().equals("2026-09-10")).findFirst().orElse(null);
+        assertNotNull(sep10);
+        assertEquals(0L, ((Number) sep10[1]).longValue());
+        assertEquals(1L, ((Number) sep10[2]).longValue());
+        assertEquals(1L, ((Number) sep10[3]).longValue());
+    }
+
+    @Test
+    void summarizeByStudentAndSubjectGrouped_returnsSubjectSummaries() {
+        Section section = createTestSection();
+        Student student = createTestStudent(section);
+        Subject subjectX = createTestSubject();
+        Subject subjectY = createTestSubject();
+        Teacher teacher = createTestTeacher();
+
+        saveRecord(student, subjectX, section, teacher, true, "2026-09-01");
+        saveRecord(student, subjectX, section, teacher, false, "2026-09-04");
+        saveRecord(student, subjectY, section, teacher, true, "2026-09-04");
+        saveRecord(student, subjectY, section, teacher, false, "2026-09-10");
+
+        List<Object[]> results = aggregationRepository.summarizeByStudentAndSubjectGrouped(student.getId(), null, null);
+
+        assertEquals(2, results.size());
+        Object[] subjX = results.stream().filter(r -> ((Number) r[0]).longValue() == subjectX.getId()).findFirst().orElse(null);
+        assertNotNull(subjX);
+        assertEquals("TestSubject", subjX[1]);
+        assertEquals(1L, ((Number) subjX[2]).longValue());
+        assertEquals(2L, ((Number) subjX[3]).longValue());
+        Object[] subjY = results.stream().filter(r -> ((Number) r[0]).longValue() == subjectY.getId()).findFirst().orElse(null);
+        assertNotNull(subjY);
+        assertEquals(1L, ((Number) subjY[2]).longValue());
+        assertEquals(2L, ((Number) subjY[3]).longValue());
+    }
+
+    @Test
+    void groupedQueries_withNullDates() {
+        Section section = createTestSection();
+        Student student = createTestStudent(section);
+        Subject subject = createTestSubject();
+        Teacher teacher = createTestTeacher();
+
+        saveRecord(student, subject, section, teacher, true, "2026-09-01");
+        saveRecord(student, subject, section, teacher, false, "2026-09-10");
+
+        List<Object[]> calendarResults = aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(student.getId(), null, null);
+        List<Object[]> subjectResults = aggregationRepository.summarizeByStudentAndSubjectGrouped(student.getId(), null, null);
+
+        assertEquals(2, calendarResults.size());
+        assertEquals(1, subjectResults.size());
+    }
+
+    @Test
+    void groupedQueries_VARCHAR_dateStringComparison() {
+        Section section = createTestSection();
+        Student student = createTestStudent(section);
+        Subject subject = createTestSubject();
+        Teacher teacher = createTestTeacher();
+
+        saveRecord(student, subject, section, teacher, true, "2026-09-01");
+        saveRecord(student, subject, section, teacher, false, "2026-09-10");
+        saveRecord(student, subject, section, teacher, true, "2026-09-20");
+
+        List<Object[]> results = aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(
+                student.getId(), "2026-09-05", "2026-09-15");
+
+        assertEquals(1, results.size());
+        assertEquals("2026-09-10", results.get(0)[0]);
+    }
+
+    @Test
+    void groupedQueries_multipleRecordsSameDate() {
+        Section section = createTestSection();
+        Student student = createTestStudent(section);
+        Subject subjectX = createTestSubject();
+        Subject subjectY = createTestSubject();
+        Teacher teacher = createTestTeacher();
+
+        saveRecord(student, subjectX, section, teacher, true, "2026-09-04");
+        saveRecord(student, subjectY, section, teacher, false, "2026-09-04");
+
+        List<Object[]> calendarResults = aggregationRepository.countPresentAbsentTotalByStudentAndDateRangeGrouped(student.getId(), null, null);
+
+        assertEquals(1, calendarResults.size());
+        Object[] record = calendarResults.get(0);
+        assertEquals("2026-09-04", record[0]);
+        assertEquals(1L, ((Number) record[1]).longValue());
+        assertEquals(1L, ((Number) record[2]).longValue());
+        assertEquals(2L, ((Number) record[3]).longValue());
     }
 }
