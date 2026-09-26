@@ -148,6 +148,25 @@
                     <target>17</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!--
+                        Test-only. The 61 @SpringBootTest classes collapse into ~21 distinct
+                        Spring TestContext cache entries, and every cached context keeps its own
+                        Hikari pool open for the whole run. With Hikari's default
+                        minimumIdle == maximumPoolSize == 10 that is up to ~210 concurrent
+                        connections, which overruns MySQL's default max_connections=151
+                        (observed Max_used_connections=152, Connection_errors_max_connections=344).
+                        Once saturated, Flyway cannot open its migration connection, the context
+                        fails to load, and every test in it errors out. Capping the per-context
+                        pool for the test JVM only keeps total usage under the server limit.
+                        Runtime behaviour is untouched: this applies solely to the surefire fork.
+                    -->
+                    <argLine>-Dspring.datasource.hikari.maximum-pool-size=4 -Dspring.datasource.hikari.minimum-idle=1</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
