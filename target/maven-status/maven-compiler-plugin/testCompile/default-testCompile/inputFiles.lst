@@ -52,6 +52,7 @@ D:\DAGACS\backend\src\test\java\com\dagacs\controller\AcademicSessionControllerT
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\SemesterControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\StudentImportIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\config\AcademicSessionLegacySchemaMigrationTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\export\StudentWiseRegisterExportRenderingTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\HodAnalyticsIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\AdminTeacherManagementControllerTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\AttendanceDataIntegrityIntegrationTest.java

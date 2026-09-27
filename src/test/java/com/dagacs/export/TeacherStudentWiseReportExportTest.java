@@ -137,7 +137,8 @@ class TeacherStudentWiseReportExportTest {
                 LocalDate.of(2026, 8, 12), LocalDate.of(2026, 9, 12), 1L, 2L, null);
         var captor = org.mockito.ArgumentCaptor.forClass(ExportData.class);
         if (format == ExportFormat.XLSX) {
-            org.mockito.Mockito.verify(excelGenerator).generate(captor.capture());
+            // The register opts into the frozen header / identity columns.
+            org.mockito.Mockito.verify(excelGenerator).generate(captor.capture(), eq(true));
         } else {
             org.mockito.Mockito.verify(pdfGenerator).generate(captor.capture());
         }
@@ -145,7 +146,7 @@ class TeacherStudentWiseReportExportTest {
     }
 
     @Test
-    @DisplayName("register columns are Enrollment, Name, session dates, Present, Total Classes, Percentage")
+    @DisplayName("register columns are Enrollment, Name, session dates, Total Present, Total Classes, Percentage")
     void register_columnOrder() {
         stubReport();
         ExportData data = capture(ExportFormat.XLSX);
@@ -158,7 +159,7 @@ class TeacherStudentWiseReportExportTest {
         assertEquals("2026-08-14 | LP1", headers.get(3));
         assertEquals("2026-08-18 | LP1", headers.get(4));
         // Final three columns.
-        assertEquals("Present", headers.get(5));
+        assertEquals("Total Present", headers.get(5));
         assertEquals("Total Classes", headers.get(6));
         assertEquals("Percentage", headers.get(7));
         assertEquals(8, headers.size());
@@ -230,68 +231,119 @@ class TeacherStudentWiseReportExportTest {
     }
 
     @Test
-    @DisplayName("title/subtitle carry the report identity, subject, section, teacher and range")
+    @DisplayName("the three-row title block carries report, teacher, subject, section and range")
     void register_metadata() {
         stubReport();
         ExportData data = capture(ExportFormat.XLSX);
 
-        assertTrue(data.title().contains("DAGACS"));
-        assertTrue(data.title().contains("Student Attendance Report"));
-        assertTrue(data.subtitle().contains("Subject: DBMS"));
-        assertTrue(data.subtitle().contains("Section: CSE-A"));
-        assertTrue(data.subtitle().contains("Asha Teacher"));
-        assertTrue(data.subtitle().contains("2026-08-12"));
-        assertTrue(data.subtitle().contains("2026-09-12"));
+        // Row 1: the report identity.
+        assertTrue(data.title().contains("DAGACS"), data.title());
+        assertTrue(data.title().contains("Teacher Attendance Report"), data.title());
+        // Row 2: the teacher.
+        assertEquals("Teacher: Asha Teacher", data.subtitle());
+        // Row 3: subject, section and date range.
+        assertEquals(1, data.metaLines().size(), data.metaLines().toString());
+        String meta = data.metaLines().get(0);
+        assertTrue(meta.contains("Subject: DBMS"), meta);
+        assertTrue(meta.contains("Section: CSE-A"), meta);
+        assertTrue(meta.contains("2026-08-12"), meta);
+        assertTrue(meta.contains("2026-09-12"), meta);
     }
 
     @Test
-    @DisplayName("a legend explains P and Absent")
+    @DisplayName("a legend explains P and A, including that unmarked counts as absent")
     void register_legend() {
         stubReport();
         ExportData data = capture(ExportFormat.XLSX);
 
-        boolean legend = data.rows().stream()
-                .anyMatch(r -> !r.isEmpty() && String.valueOf(r.get(0)).equals("Legend"));
-        assertTrue(legend, "expected a P = Present / A = Absent legend row");
+        List<Object> legend = data.rows().stream()
+                .filter(r -> !r.isEmpty() && "Legend".equals(String.valueOf(r.get(0))))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected a P = Present / A = Absent legend row"));
+        assertTrue(String.valueOf(legend.get(1)).contains("P = Present"));
+        assertTrue(String.valueOf(legend.get(1)).contains("A = Absent"));
     }
 
     @Test
-    @DisplayName("PDF is a clean summary, not the wide per-session matrix")
-    void pdf_isSummaryOnly() {
+    @DisplayName("the PDF is the same date-wise register, not a summary without date columns")
+    void pdf_isDateWiseRegister() {
         stubReport();
         ExportData data = capture(ExportFormat.PDF);
 
-        assertEquals(List.of("Enrollment No.", "Student Name", "Present", "Total Classes",
-                "Percentage"), data.headers());
+        // The PDF keeps the per-session date columns, so it shows the same
+        // attendance detail as the web report and the spreadsheet.
+        assertEquals(List.of("Enrollment No.", "Student Name",
+                "2026-08-12 | LP1", "2026-08-14 | LP1", "2026-08-18 | LP1",
+                "Total Present", "Total Classes", "Percentage"), data.headers());
 
         List<Object> row = data.rows().get(0);
-        assertEquals(5, row.size());
         assertEquals("DAGACS001", row.get(0));
         assertEquals("Rahul Sharma", row.get(1));
-        assertEquals(2L, row.get(2));
-        assertEquals(3L, row.get(3));
-        assertEquals("66.67%", row.get(4));
-
-        // No per-session date columns and no legend row in the PDF.
-        assertFalse(data.headers().stream().anyMatch(h -> h.contains("LP1")));
-        assertTrue(data.subtitle().contains("Subject: DBMS"));
+        assertEquals("P", row.get(2));
+        assertEquals("A", row.get(3));
+        assertEquals("P", row.get(4));
+        assertEquals(2L, row.get(5));
+        assertEquals(3L, row.get(6));
+        assertEquals("66.67%", row.get(7));
     }
 
     @Test
-    @DisplayName("Excel and PDF agree on every attendance number for the same filters")
+    @DisplayName("Excel and PDF agree on every cell for the same filters")
     void excelAndPdf_agree() {
         stubReport();
         ExportData xlsx = capture(ExportFormat.XLSX);
         ExportData pdf = capture(ExportFormat.PDF);
 
-        for (int i = 0; i < 2; i++) {
-            List<Object> excelRow = xlsx.rows().get(i);
-            List<Object> pdfRow = pdf.rows().get(i);
-            assertEquals(excelRow.get(0), pdfRow.get(0), "enrollment");
-            assertEquals(excelRow.get(1), pdfRow.get(1), "name");
-            assertEquals(excelRow.get(5), pdfRow.get(2), "present");
-            assertEquals(excelRow.get(6), pdfRow.get(3), "total classes");
-            assertEquals(excelRow.get(7), pdfRow.get(4), "percentage");
+        assertEquals(xlsx.headers(), pdf.headers());
+        assertEquals(xlsx.rows(), pdf.rows());
+    }
+
+    @Test
+    @DisplayName("an unmarked or missing attendance mark renders as A, never blank")
+    void unmarked_isAbsent() {
+        StudentWiseColumnDTO c1 = StudentWiseColumnDTO.builder()
+                .sessionId(100L).date("2026-08-12").lecturePeriod("LP1").build();
+        StudentWiseColumnDTO c2 = StudentWiseColumnDTO.builder()
+                .sessionId(101L).date("2026-08-14").lecturePeriod("LP1").build();
+        StudentWiseColumnDTO c3 = StudentWiseColumnDTO.builder()
+                .sessionId(102L).date("2026-08-18").lecturePeriod("LP1").build();
+
+        // Session 100 present, 101 explicitly absent, 102 has no record at all
+        // (the teacher never marked it). Only one present of three conducted
+        // classes -> 33.33%.
+        StudentWiseRowDTO row = StudentWiseRowDTO.builder()
+                .studentId(1L)
+                .enrollmentNumber("DAGACS001")
+                .name("Rahul Sharma")
+                .presentCount(1L)
+                .totalRecordedCount(3L)
+                .percentage(100.0 / 3)
+                .cells(List.of(
+                        StudentWiseCellDTO.builder().sessionId(100L).status("PRESENT").isPresent(true).build(),
+                        StudentWiseCellDTO.builder().sessionId(101L).status("ABSENT").isPresent(false).build()))
+                .build();
+
+        when(teacherResolver.resolve())
+                .thenReturn(Teacher.builder().id(7L).fullName("Asha Teacher").build());
+        when(studentWiseReportService.getStudentWiseReport(any(), any(), anyLong(), any(), any()))
+                .thenReturn(StudentWiseReportDTO.builder()
+                        .subjectId(1L).subjectName("DBMS").sectionId(2L).sectionName("CSE-A")
+                        .columns(List.of(c1, c2, c3))
+                        .rows(List.of(row))
+                        .build());
+
+        ExportData data = capture(ExportFormat.XLSX);
+        List<Object> exported = data.rows().get(0);
+        assertEquals("P", exported.get(2), "marked present");
+        assertEquals("A", exported.get(3), "marked absent");
+        assertEquals("A", exported.get(4), "unmarked must render as A, not blank");
+        // The unmarked session still counts towards the shared denominator.
+        assertEquals(3L, exported.get(6));
+        assertEquals("33.33%", exported.get(7));
+
+        for (Object cell : exported.subList(2, 5)) {
+            assertFalse(String.valueOf(cell).isBlank(),
+                    "an unmarked session must never render as an empty cell");
         }
     }
 

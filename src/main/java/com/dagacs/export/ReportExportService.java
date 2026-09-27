@@ -116,12 +116,15 @@ public class ReportExportService {
         if ((sectionId == null) == (batchId == null)) {
             throw new AuthException("Provide exactly one of sectionId or batchId.", 400);
         }
-        ExportData data = (format == ExportFormat.PDF)
-                ? buildTeacherStudentWiseSummaryData(startDate, endDate,
-                        subjectId, sectionId, batchId)
-                : buildTeacherStudentWiseRegisterData(startDate, endDate,
-                        subjectId, sectionId, batchId);
-        return generate(data, format);
+        // Excel and PDF render the SAME student-wise / date-wise register, so
+        // the two files can never disagree on attendance numbers. The PDF
+        // generator switches to landscape automatically for the wide layout.
+        ExportData data = buildTeacherStudentWiseRegisterData(startDate, endDate,
+                subjectId, sectionId, batchId);
+        return switch (format) {
+            case XLSX -> excelGenerator.generate(data, true);
+            case PDF -> pdfGenerator.generate(data);
+        };
     }
 
     private byte[] generate(ExportData data, ExportFormat format) {
@@ -284,11 +287,12 @@ public class ReportExportService {
     }
 
     /**
-     * Detailed XLSX attendance register for one class.
+     * Student-wise, date-wise attendance register for one class. Backs BOTH the
+     * XLSX and the PDF export so the two files can never disagree.
      *
      * <p>Logical column order is fixed:
      * {@code Enrollment No. | Student Name | <one column per CONDUCTED session date>
-     * | Present | Total Classes | Percentage}.
+     * | Total Present | Total Classes | Percentage}.
      *
      * <p>Roll number is deliberately NOT exported: the register identifies a
      * student by enrollment number and name only. {@code P}/{@code A} are the
@@ -296,6 +300,10 @@ public class ReportExportService {
      * column. The date columns come from the authoritative CONDUCTED-session set
      * carried by the report, and {@code Total Classes} is the same shared
      * denominator for every student.
+     *
+     * <p>Attendance semantics: {@code PRESENT} renders {@code P}; {@code ABSENT}
+     * and every unmarked/missing mark render {@code A}, so an unmarked student
+     * is never counted as present and never silently dropped from a date column.
      */
     private ExportData buildTeacherStudentWiseRegisterData(LocalDate startDate,
                                                            LocalDate endDate, Long subjectId,
@@ -308,7 +316,7 @@ public class ReportExportService {
         for (com.dagacs.dto.StudentWiseColumnDTO col : report.getColumns()) {
             headers.add(col.getDate() + " | " + col.getLecturePeriod());
         }
-        headers.addAll(List.of("Present", "Total Classes", "Percentage"));
+        headers.addAll(List.of("Total Present", "Total Classes", "Percentage"));
 
         List<List<Object>> rows = new ArrayList<>();
         for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
@@ -330,64 +338,45 @@ public class ReportExportService {
         if (!withLegend.isEmpty()) {
             List<Object> legend = new ArrayList<>();
             legend.add("Legend");
-            legend.add("P = Present, A = Absent");
+            legend.add("P = Present, A = Absent (unmarked counts as absent)");
             while (legend.size() < headers.size()) {
                 legend.add("");
             }
             withLegend.add(legend);
         }
 
+        // Three-row title block:
+        //   DAGACS - Teacher Attendance Report
+        //   Teacher: <name>
+        //   Subject: <x>    Section: <y>    Date Range: <a> to <b>
         return new ExportData(
-                studentWiseTitle(report),
-                studentWiseSubtitle(report, teacher, startDate, endDate),
-                "Student Register",
+                "DAGACS - Teacher Attendance Report",
+                "Teacher: " + teacher.getFullName(),
+                "Attendance Report",
                 headers,
-                withLegend);
+                withLegend,
+                List.of("Subject: " + report.getSubjectName()
+                        + "    Section: " + classLabel(report)
+                        + "    Date Range: " + dateRangeText(startDate, endDate)),
+                // One column per conducted session date: keep it landscape so
+                // no date column is ever clipped.
+                true);
+    }
+
+    private static String classLabel(StudentWiseReportDTO report) {
+        if (report.getSectionName() != null) {
+            return report.getSectionName();
+        }
+        return report.getBatchCode() != null ? "Batch " + report.getBatchCode() : "-";
     }
 
     /**
-     * Clean printable PDF summary for the same dataset: identity, present, total
-     * and percentage only. Deliberately NOT the wide per-session matrix, which
-     * stays in the XLSX register.
+     * {@code P} for present. Everything else - absent, unmarked, or a missing
+     * mark - renders {@code A}, so an unmarked student is counted as absent in
+     * the export exactly as the marking rules treat them.
      */
-    private ExportData buildTeacherStudentWiseSummaryData(LocalDate startDate,
-                                                          LocalDate endDate, Long subjectId,
-                                                          Long sectionId, Long batchId) {
-        Teacher teacher = teacherResolver.resolve();
-        StudentWiseReportDTO report = studentWiseReportService.getStudentWiseReport(
-                startDate, endDate, subjectId, sectionId, batchId);
-
-        List<String> headers =
-                List.of("Enrollment No.", "Student Name", "Present", "Total Classes", "Percentage");
-
-        List<List<Object>> rows = new ArrayList<>();
-        for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
-            List<Object> pdfRow = new ArrayList<>();
-            pdfRow.add(row.getEnrollmentNumber());
-            pdfRow.add(row.getName());
-            pdfRow.add(row.getPresentCount());
-            pdfRow.add(row.getTotalRecordedCount());
-            pdfRow.add(percentageText(row.getPercentage()));
-            rows.add(pdfRow);
-        }
-
-        return new ExportData(
-                studentWiseTitle(report),
-                studentWiseSubtitle(report, teacher, startDate, endDate),
-                "Attendance Summary",
-                headers,
-                rows);
-    }
-
-    /** {@code P}/{@code A} inside the date columns; blank for a missing mark. */
     private static String markSymbol(String status) {
-        if ("PRESENT".equals(status)) {
-            return "P";
-        }
-        if ("ABSENT".equals(status)) {
-            return "A";
-        }
-        return "";
+        return "PRESENT".equals(status) ? "P" : "A";
     }
 
     /**
@@ -404,24 +393,9 @@ public class ReportExportService {
         return null;
     }
 
-    /** Two-decimal percentage, or a dash when no class was conducted. */
+    /** Two-decimal percentage, or {@code N/A} when no class was conducted. */
     private static String percentageText(Double percentage) {
-        return percentage == null ? "-" : String.format(Locale.ROOT, "%.2f%%", percentage);
-    }
-
-    private static String studentWiseTitle(StudentWiseReportDTO report) {
-        return "DAGACS - Student Attendance Report";
-    }
-
-    private static String studentWiseSubtitle(StudentWiseReportDTO report, Teacher teacher,
-                                              LocalDate startDate, LocalDate endDate) {
-        String section = report.getSectionName() != null
-                ? report.getSectionName()
-                : (report.getBatchCode() != null ? "Batch " + report.getBatchCode() : "-");
-        return "Subject: " + report.getSubjectName()
-                + " | Section: " + section
-                + " | Teacher: " + teacher.getFullName()
-                + " | Date Range: " + dateRangeText(startDate, endDate);
+        return percentage == null ? "N/A" : String.format(Locale.ROOT, "%.2f%%", percentage);
     }
 
     private static String dateRangeText(LocalDate startDate, LocalDate endDate) {

@@ -22,6 +22,7 @@ com\dagacs\security\TeacherAttendanceOwnershipIntegrationTest.class
 com\dagacs\service\ProgramServiceTest.class
 com\dagacs\service\SemesterServiceTest.class
 com\dagacs\dto\AttendanceAuditLogDTOTest.class
+com\dagacs\export\StudentWiseRegisterExportRenderingTest$ByteArrayOutputStreamHolder.class
 com\dagacs\security\StudentPasswordChangeIntegrationTest.class
 com\dagacs\security\TeacherAttendanceOwnershipIntegrationTest$Slice.class
 com\dagacs\security\HodTeachingAccessIntegrationTest.class
@@ -33,6 +34,7 @@ com\dagacs\repository\SubjectOfferingRepositoryTest.class
 com\dagacs\config\SectionSubjectSchemaMigrationTest.class
 com\dagacs\service\AttendanceServiceTest.class
 com\dagacs\security\StudentWiseIntegrationTest.class
+com\dagacs\export\StudentWiseRegisterExportRenderingTest.class
 com\dagacs\service\StudentManagementServiceTest.class
 com\dagacs\repository\AttendanceAuditLogRepositoryTest.class
 com\dagacs\config\TeacherAssignmentSchemaMigrationTest.class
