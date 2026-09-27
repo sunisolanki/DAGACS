@@ -31,6 +31,7 @@ public interface TeacherStudentWiseReportRepository extends JpaRepository<Attend
             + "JOIN ar.student stu JOIN ar.subject sub "
             + "LEFT JOIN ar.section sec LEFT JOIN ar.batch bat "
             + "WHERE t.id = :teacherId "
+            + "AND s.status = 'CONDUCTED' "
             + "AND (:subjectId IS NULL OR sub.id = :subjectId) "
             + "AND (:startDate IS NULL OR ar.date >= :startDate) "
             + "AND (:endDate IS NULL OR ar.date <= :endDate) "
@@ -48,6 +49,47 @@ public interface TeacherStudentWiseReportRepository extends JpaRepository<Attend
             @Param("subjectId") Long subjectId,
             @Param("sectionId") Long sectionId,
             @Param("batchId") Long batchId);
+
+    /**
+     * Authoritative CONDUCTED-session set for the selected teaching context and
+     * date range. This - not the per-student attendance-record count - is the
+     * source of truth for both the matrix date columns and the {@code Total
+     * Classes} denominator, so a conducted class is counted even when a given
+     * student has no record for it, and no student can have a smaller
+     * denominator than a classmate.
+     *
+     * <p>Scope mirrors the record query exactly (own sessions, CONDUCTED only,
+     * authorized subject/section, inclusive range) so the columns and the
+     * denominator can never disagree.
+     */
+    @Query("SELECT s.id AS sessionId, s.date AS date, s.lecturePeriod AS lecturePeriod "
+            + "FROM AttendanceSession s "
+            + "JOIN s.teacherEntity t JOIN s.subjectEntity sub "
+            + "LEFT JOIN s.sectionEntity sec LEFT JOIN s.batchEntity bat "
+            + "WHERE t.id = :teacherId "
+            + "AND s.status = 'CONDUCTED' "
+            + "AND sub.id = :subjectId "
+            + "AND (:startDate IS NULL OR s.date >= :startDate) "
+            + "AND (:endDate IS NULL OR s.date <= :endDate) "
+            + "AND (:sectionId IS NULL OR sec.id = :sectionId) "
+            + "AND (:batchId IS NULL OR bat.id = :batchId) "
+            + "ORDER BY s.date ASC, s.lecturePeriod ASC")
+    List<ConductedSessionProjection> findConductedSessions(
+            @Param("teacherId") Long teacherId,
+            @Param("subjectId") Long subjectId,
+            @Param("sectionId") Long sectionId,
+            @Param("batchId") Long batchId,
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate);
+
+    /** One CONDUCTED session: its identity, date and lecture period. */
+    interface ConductedSessionProjection {
+        Long getSessionId();
+
+        String getDate();
+
+        String getLecturePeriod();
+    }
 
     interface StudentWiseRecordAggregation {
         Long getStudentId();

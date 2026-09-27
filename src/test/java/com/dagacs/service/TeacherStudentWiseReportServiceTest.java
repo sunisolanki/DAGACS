@@ -10,6 +10,7 @@ import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.SubjectRepository;
 import com.dagacs.repository.TeacherStudentWiseReportRepository;
+import com.dagacs.repository.TeacherStudentWiseReportRepository.ConductedSessionProjection;
 import com.dagacs.repository.TeacherStudentWiseReportRepository.StudentWiseRecordAggregation;
 import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
 import com.dagacs.security.AuthenticatedTeacherResolver;
@@ -90,8 +91,19 @@ class TeacherStudentWiseReportServiceTest {
         return r;
     }
 
-    private void stubSectionContext() {
-        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
+    /**
+     * One CONDUCTED session as returned by the authoritative session query that
+     * now drives both the matrix columns and the Total Classes denominator.
+     */
+    private ConductedSessionProjection session(Long sessionId, String date, String period) {
+        ConductedSessionProjection s = mock(ConductedSessionProjection.class);
+        lenient().when(s.getSessionId()).thenReturn(sessionId);
+        lenient().when(s.getDate()).thenReturn(date);
+        lenient().when(s.getLecturePeriod()).thenReturn(period);
+        return s;
+    }
+
+    private void stubSectionContext() {        when(subjectRepository.findById(1L)).thenReturn(Optional.of(subject));
         when(sectionRepository.findById(2L)).thenReturn(Optional.of(section));
         when(assignmentRepository.existsByTeacherIdAndSectionIdAndSubjectOfferingSubjectId(
                 eq(7L), eq(2L), eq(1L))).thenReturn(true);
@@ -204,6 +216,15 @@ class TeacherStudentWiseReportServiceTest {
         when(reportRepository.findStudentWiseByTeacherAndDateRange(
                 eq(7L), isNull(), isNull(), eq(1L), eq(2L), isNull()))
                 .thenReturn(List.of(r1, r2, r3, r4));
+        // The authoritative CONDUCTED set drives the columns and the shared
+        // Total Classes denominator. Built first so the inner mock stubbing is
+        // not nested inside the outer when(...).
+        List<ConductedSessionProjection> conducted = List.of(
+                session(100L, "2026-01-10", "LP1"),
+                session(101L, "2026-01-10", "LP2"));
+        when(reportRepository.findConductedSessions(
+                eq(7L), eq(1L), eq(2L), isNull(), isNull(), isNull()))
+                .thenReturn(conducted);
 
         StudentWiseReportDTO dto = service.getStudentWiseReport(null, null, 1L, 2L, null);
 

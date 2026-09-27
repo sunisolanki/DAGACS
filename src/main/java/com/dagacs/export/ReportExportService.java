@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -115,8 +116,11 @@ public class ReportExportService {
         if ((sectionId == null) == (batchId == null)) {
             throw new AuthException("Provide exactly one of sectionId or batchId.", 400);
         }
-        ExportData data = buildTeacherStudentWiseExportData(startDate, endDate,
-                subjectId, sectionId, batchId);
+        ExportData data = (format == ExportFormat.PDF)
+                ? buildTeacherStudentWiseSummaryData(startDate, endDate,
+                        subjectId, sectionId, batchId)
+                : buildTeacherStudentWiseRegisterData(startDate, endDate,
+                        subjectId, sectionId, batchId);
         return generate(data, format);
     }
 
@@ -280,60 +284,144 @@ public class ReportExportService {
     }
 
     /**
-     * Additive builder mapping the normalized per-session matrix (sessionId-keyed
-     * cells) into the flat ExportData table. Column headers keep the
-     * (date, lecturePeriod) identity; no same-date collapsing.
+     * Detailed XLSX attendance register for one class.
+     *
+     * <p>Logical column order is fixed:
+     * {@code Enrollment No. | Student Name | <one column per CONDUCTED session date>
+     * | Present | Total Classes | Percentage}.
+     *
+     * <p>Roll number is deliberately NOT exported: the register identifies a
+     * student by enrollment number and name only. {@code P}/{@code A} are the
+     * values <i>inside</i> the date columns - there is no separate status
+     * column. The date columns come from the authoritative CONDUCTED-session set
+     * carried by the report, and {@code Total Classes} is the same shared
+     * denominator for every student.
      */
-    private ExportData buildTeacherStudentWiseExportData(LocalDate startDate,
-                                                         LocalDate endDate, Long subjectId,
-                                                         Long sectionId, Long batchId) {
+    private ExportData buildTeacherStudentWiseRegisterData(LocalDate startDate,
+                                                           LocalDate endDate, Long subjectId,
+                                                           Long sectionId, Long batchId) {
         Teacher teacher = teacherResolver.resolve();
         StudentWiseReportDTO report = studentWiseReportService.getStudentWiseReport(
                 startDate, endDate, subjectId, sectionId, batchId);
-        String subtitle = "Teacher: " + teacher.getFullName() + " | " + dateRangeText(startDate, endDate);
 
-        List<String> headers = new ArrayList<>(List.of(
-                "Enrollment Number", "Roll Number", "Student Name"));
-        for (int i = 0; i < report.getColumns().size(); i++) {
-            com.dagacs.dto.StudentWiseColumnDTO col = report.getColumns().get(i);
+        List<String> headers = new ArrayList<>(List.of("Enrollment No.", "Student Name"));
+        for (com.dagacs.dto.StudentWiseColumnDTO col : report.getColumns()) {
             headers.add(col.getDate() + " | " + col.getLecturePeriod());
         }
-        headers.addAll(List.of("Present", "Total Recorded", "Percentage (%)", "Batch Code"));
+        headers.addAll(List.of("Present", "Total Classes", "Percentage"));
 
         List<List<Object>> rows = new ArrayList<>();
         for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
-            String[] cells = new String[report.getColumns().size()];
-            for (com.dagacs.dto.StudentWiseCellDTO cell : row.getCells()) {
-                int index = indexOfColumn(report, cell.getSessionId());
-                if (index >= 0) {
-                    cells[index] = cell.getStatus();
-                }
-            }
             List<Object> excelRow = new ArrayList<>();
             excelRow.add(row.getEnrollmentNumber());
-            excelRow.add(row.getRollNumber());
             excelRow.add(row.getName());
-            excelRow.addAll(java.util.Arrays.asList(cells));
+            for (com.dagacs.dto.StudentWiseColumnDTO col : report.getColumns()) {
+                excelRow.add(markSymbol(cellStatusFor(row, col.getSessionId())));
+            }
             excelRow.add(row.getPresentCount());
             excelRow.add(row.getTotalRecordedCount());
-            excelRow.add(row.getPercentage());
-            excelRow.add(report.getBatchCode());
+            excelRow.add(percentageText(row.getPercentage()));
             rows.add(excelRow);
         }
 
-        String title = report.getSectionName() != null
-                ? "Student-Wise Attendance - " + report.getSubjectName() + " - " + report.getSectionName()
-                : "Student-Wise Attendance - " + report.getSubjectName() + " - " + report.getBatchCode();
-        return new ExportData(title, subtitle, "Student-wise", headers, rows);
+        // Legend below the table, padded to the header width so the sheet stays
+        // rectangular and every row maps one-to-one onto the columns.
+        List<List<Object>> withLegend = new ArrayList<>(rows);
+        if (!withLegend.isEmpty()) {
+            List<Object> legend = new ArrayList<>();
+            legend.add("Legend");
+            legend.add("P = Present, A = Absent");
+            while (legend.size() < headers.size()) {
+                legend.add("");
+            }
+            withLegend.add(legend);
+        }
+
+        return new ExportData(
+                studentWiseTitle(report),
+                studentWiseSubtitle(report, teacher, startDate, endDate),
+                "Student Register",
+                headers,
+                withLegend);
     }
 
-    private static int indexOfColumn(StudentWiseReportDTO report, Long sessionId) {
-        for (int i = 0; i < report.getColumns().size(); i++) {
-            if (sessionId.equals(report.getColumns().get(i).getSessionId())) {
-                return i;
+    /**
+     * Clean printable PDF summary for the same dataset: identity, present, total
+     * and percentage only. Deliberately NOT the wide per-session matrix, which
+     * stays in the XLSX register.
+     */
+    private ExportData buildTeacherStudentWiseSummaryData(LocalDate startDate,
+                                                          LocalDate endDate, Long subjectId,
+                                                          Long sectionId, Long batchId) {
+        Teacher teacher = teacherResolver.resolve();
+        StudentWiseReportDTO report = studentWiseReportService.getStudentWiseReport(
+                startDate, endDate, subjectId, sectionId, batchId);
+
+        List<String> headers =
+                List.of("Enrollment No.", "Student Name", "Present", "Total Classes", "Percentage");
+
+        List<List<Object>> rows = new ArrayList<>();
+        for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
+            List<Object> pdfRow = new ArrayList<>();
+            pdfRow.add(row.getEnrollmentNumber());
+            pdfRow.add(row.getName());
+            pdfRow.add(row.getPresentCount());
+            pdfRow.add(row.getTotalRecordedCount());
+            pdfRow.add(percentageText(row.getPercentage()));
+            rows.add(pdfRow);
+        }
+
+        return new ExportData(
+                studentWiseTitle(report),
+                studentWiseSubtitle(report, teacher, startDate, endDate),
+                "Attendance Summary",
+                headers,
+                rows);
+    }
+
+    /** {@code P}/{@code A} inside the date columns; blank for a missing mark. */
+    private static String markSymbol(String status) {
+        if ("PRESENT".equals(status)) {
+            return "P";
+        }
+        if ("ABSENT".equals(status)) {
+            return "A";
+        }
+        return "";
+    }
+
+    /**
+     * Status of one session for one student, or {@code null} when the student
+     * has no record for that session. Mirrors the Flutter model's
+     * {@code StudentWiseRow.cellStatus} so both renderings agree.
+     */
+    private static String cellStatusFor(com.dagacs.dto.StudentWiseRowDTO row, Long sessionId) {
+        for (com.dagacs.dto.StudentWiseCellDTO cell : row.getCells()) {
+            if (sessionId.equals(cell.getSessionId())) {
+                return cell.getStatus();
             }
         }
-        return -1;
+        return null;
+    }
+
+    /** Two-decimal percentage, or a dash when no class was conducted. */
+    private static String percentageText(Double percentage) {
+        return percentage == null ? "-" : String.format(Locale.ROOT, "%.2f%%", percentage);
+    }
+
+    private static String studentWiseTitle(StudentWiseReportDTO report) {
+        return "DAGACS - Student Attendance Report";
+    }
+
+    private static String studentWiseSubtitle(StudentWiseReportDTO report, Teacher teacher,
+                                              LocalDate startDate, LocalDate endDate) {
+        String section = report.getSectionName() != null
+                ? report.getSectionName()
+                : (report.getBatchCode() != null ? "Batch " + report.getBatchCode() : "-");
+        return "Subject: " + report.getSubjectName()
+                + " | Section: " + section
+                + " | Teacher: " + teacher.getFullName()
+                + " | Date Range: " + dateRangeText(startDate, endDate);
     }
 
     private static String dateRangeText(LocalDate startDate, LocalDate endDate) {

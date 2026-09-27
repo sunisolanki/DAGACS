@@ -13,6 +13,7 @@ import com.dagacs.repository.BatchRepository;
 import com.dagacs.repository.SectionRepository;
 import com.dagacs.repository.SubjectRepository;
 import com.dagacs.repository.TeacherStudentWiseReportRepository;
+import com.dagacs.repository.TeacherStudentWiseReportRepository.ConductedSessionProjection;
 import com.dagacs.repository.TeacherStudentWiseReportRepository.StudentWiseRecordAggregation;
 import com.dagacs.repository.TeacherSubjectSectionAssignmentRepository;
 import com.dagacs.security.AuthenticatedTeacherResolver;
@@ -108,6 +109,23 @@ public class TeacherStudentWiseReportService {
         String start = toCanonicalString(startDate);
         String end = toCanonicalString(endDate);
 
+        // Authoritative CONDUCTED-session set for this context/range. It drives
+        // BOTH the matrix date columns and the Total Classes denominator, so
+        // every student in the report shares one denominator and a conducted
+        // class still counts when a particular student has no record for it.
+        List<ConductedSessionProjection> sessions =
+                reportRepository.findConductedSessions(
+                        teacher.getId(), subjectId, sectionId, batchId, start, end);
+        List<StudentWiseColumnDTO> columns = new ArrayList<>();
+        for (TeacherStudentWiseReportRepository.ConductedSessionProjection s : sessions) {
+            columns.add(StudentWiseColumnDTO.builder()
+                    .sessionId(s.getSessionId())
+                    .date(s.getDate())
+                    .lecturePeriod(s.getLecturePeriod())
+                    .build());
+        }
+        final long totalClasses = columns.size();
+
         List<StudentWiseRecordAggregation> records = reportRepository
                 .findStudentWiseByTeacherAndDateRange(teacher.getId(), start, end,
                         subjectId, sectionId, batchId);
@@ -119,7 +137,7 @@ public class TeacherStudentWiseReportService {
                         .subjectName(subject.getName())
                         .sectionId(sectionId)
                         .sectionName(section != null ? section.getName() : null)
-                        .columns(List.of())
+                        .columns(columns)
                         .rows(List.of())
                         .build();
             }
@@ -129,27 +147,15 @@ public class TeacherStudentWiseReportService {
                     .subjectName(subject.getName())
                     .batchId(batchId)
                     .batchCode(batch != null ? batch.getBatchCode() : null)
-                    .columns(List.of())
+                    .columns(columns)
                     .rows(List.of())
                     .build();
         }
-
-        // Distinct (date, lecturePeriod) sessions in the query's own order.
-        Map<Long, StudentWiseColumnDTO> columnsById = new LinkedHashMap<>();
-        for (StudentWiseRecordAggregation r : records) {
-            columnsById.computeIfAbsent(r.getSessionId(), id -> StudentWiseColumnDTO.builder()
-                    .sessionId(id)
-                    .date(r.getDate())
-                    .lecturePeriod(r.getLecturePeriod())
-                    .build());
-        }
-        List<StudentWiseColumnDTO> columns = new ArrayList<>(columnsById.values());
 
         // Rows grouped per student in the query's enrollment ASC order.
         Map<Long, StudentWiseRowDTO.StudentWiseRowDTOBuilder> rowsById = new LinkedHashMap<>();
         Map<Long, List<StudentWiseCellDTO>> cellsByStudent = new LinkedHashMap<>();
         Map<Long, Long> presentById = new LinkedHashMap<>();
-        Map<Long, Long> totalById = new LinkedHashMap<>();
 
         StudentWiseReportDTO.StudentWiseReportDTOBuilder report = StudentWiseReportDTO.builder();
 
@@ -167,7 +173,8 @@ public class TeacherStudentWiseReportService {
                             .status(r.getStatus())
                             .isPresent(r.getIsPresent())
                             .build());
-            totalById.merge(studentId, 1L, Long::sum);
+            // Total Classes is deliberately NOT counted here: it is the shared
+            // conducted-session denominator computed above.
             if (Boolean.TRUE.equals(r.getIsPresent())) {
                 presentById.merge(studentId, 1L, Long::sum);
             }
@@ -183,12 +190,11 @@ public class TeacherStudentWiseReportService {
         List<StudentWiseRowDTO> rows = new ArrayList<>();
         for (Map.Entry<Long, StudentWiseRowDTO.StudentWiseRowDTOBuilder> entry : rowsById.entrySet()) {
             Long studentId = entry.getKey();
-            long total = totalById.getOrDefault(studentId, 0L);
             long present = presentById.getOrDefault(studentId, 0L);
             StudentWiseRowDTO.StudentWiseRowDTOBuilder builder = entry.getValue();
             builder.presentCount(present)
-                    .totalRecordedCount(total)
-                    .percentage(computePercentage(present, total))
+                    .totalRecordedCount(totalClasses)
+                    .percentage(computePercentage(present, totalClasses))
                     .cells(cellsByStudent.getOrDefault(studentId, List.of()));
             rows.add(builder.build());
         }

@@ -17,6 +17,7 @@ D:\DAGACS\backend\src\test\java\com\dagacs\dto\AttendanceUpdateRequestDTOTest.ja
 D:\DAGACS\backend\src\test\java\com\dagacs\security\AttendanceCalculationOwnershipIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\StudentManagementServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\dto\BatchDTOValidationTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\export\TeacherStudentWiseReportExportTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\TeacherStudentWiseReportServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\AttendanceRecordServiceTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\controller\AdminTeacherAssignmentControllerTest.java

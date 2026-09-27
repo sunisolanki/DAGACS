@@ -597,6 +597,70 @@ class StudentWiseIntegrationTest {
     // ── Percentage semantics (M4 private copy) (1) ──────────────
 
     @Test
+    void matrix_scheduledSessionWithRecords_isExcluded() throws Exception {
+        Slice a = slice("A");
+        Teacher t = createTeacherAccount("sw_sched@dagacs.local", "Pass@123", a.dept);
+        assign(t, a.offering, a.section);
+        Student s1 = student(a, "Student A1", "ENR-001");
+
+        // A real CONDUCTED class with a real record.
+        record(saveSession(a.subject, a.section, t, "2026-01-10", "LP1", "CONDUCTED"), s1, true);
+        // A SCHEDULED session that nonetheless carries a record (status was
+        // overridden after marking): it must not become a column and must not
+        // contribute to Total Classes.
+        record(saveSession(a.subject, a.section, t, "2026-01-12", "LPX", "SCHEDULED"), s1, true);
+        flush();
+
+        String token = login("sw_sched@dagacs.local", "Pass@123");
+        JsonNode root = fetchJson("/api/teacher/attendance/student-wise?subjectId=" + a.subject.getId()
+                + "&sectionId=" + a.section.getId(), token);
+        assertEquals(1, root.get("columns").size());
+        assertEquals("LP1", root.get("columns").get(0).get("lecturePeriod").asText());
+        assertEquals(1, root.get("rows").get(0).get("totalRecordedCount").asInt());
+    }
+
+    @Test
+    void matrix_totalClasses_isSharedConductedDenominator() throws Exception {
+        Slice a = slice("A");
+        Teacher t = createTeacherAccount("sw_shared@dagacs.local", "Pass@123", a.dept);
+        assign(t, a.offering, a.section);
+        Student s1 = student(a, "Full", "ENR-001");
+        Student s2 = student(a, "Partial", "ENR-002");
+
+        // Three conducted classes...
+        AttendanceSession lp1 = saveSession(a.subject, a.section, t, "2026-01-10", "LP1", "CONDUCTED");
+        AttendanceSession lp2 = saveSession(a.subject, a.section, t, "2026-01-12", "LP2", "CONDUCTED");
+        AttendanceSession lp3 = saveSession(a.subject, a.section, t, "2026-01-14", "LP3", "CONDUCTED");
+        // ...but s2 is only marked for two of them.
+        record(lp1, s1, true);
+        record(lp1, s2, true);
+        record(lp2, s1, false);
+        record(lp3, s1, true);
+        flush();
+
+        String token = login("sw_shared@dagacs.local", "Pass@123");
+        JsonNode root = fetchJson("/api/teacher/attendance/student-wise?subjectId=" + a.subject.getId()
+                + "&sectionId=" + a.section.getId(), token);
+        assertEquals(3, root.get("columns").size());
+        for (JsonNode row : root.get("rows")) {
+            // Both students share the conducted-session denominator: a missing
+            // mark lowers the percentage instead of shrinking the total.
+            assertEquals(3, row.get("totalRecordedCount").asInt(),
+                    "denominator must be the conducted count for " + row.get("enrollmentNumber"));
+        }
+        JsonNode partial = null;
+        for (JsonNode row : root.get("rows")) {
+            if ("ENR-002".equals(row.get("enrollmentNumber").asText())) {
+                partial = row;
+            }
+        }
+        assertNotNull(partial, "expected the partially-marked student");
+        assertEquals(1, partial.get("presentCount").asInt());
+        assertEquals(1, partial.get("cells").size(), "only marked sessions carry a cell");
+        assertEquals(100.0 / 3, partial.get("percentage").asDouble(), 0.001);
+    }
+
+    @Test
     void matrix_percentage_usesM4PrivateCopy() throws Exception {
         Slice a = slice("A");
         Teacher t = createTeacherAccount("sw_7@dagacs.local", "Pass@123", a.dept);

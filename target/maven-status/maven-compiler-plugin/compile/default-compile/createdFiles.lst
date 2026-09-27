@@ -112,6 +112,7 @@ com\dagacs\dto\SubjectDTO.class
 com\dagacs\dto\SubjectOfferingDTO.class
 com\dagacs\dto\StudentWiseCellDTO$StudentWiseCellDTOBuilder.class
 com\dagacs\dto\TeacherLoginStatusDTO$TeacherLoginStatusDTOBuilder.class
+com\dagacs\repository\TeacherStudentWiseReportRepository$ConductedSessionProjection.class
 com\dagacs\dto\AuthResponse.class
 com\dagacs\repository\HodAnalyticsRepository$SubjectAggregation.class
 com\dagacs\dto\StudentFilterOption.class

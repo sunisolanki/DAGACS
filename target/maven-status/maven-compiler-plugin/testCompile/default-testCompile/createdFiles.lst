@@ -45,6 +45,7 @@ com\dagacs\security\StudentAttendanceOwnershipIntegrationTest.class
 com\dagacs\service\TeacherStudentWiseReportServiceTest.class
 com\dagacs\controller\TeacherAssignmentControllerTest.class
 com\dagacs\security\HodIdentityIntegrationTest.class
+com\dagacs\export\TeacherStudentWiseReportExportTest.class
 com\dagacs\security\CorsTest.class
 com\dagacs\controller\SubjectOfferingControllerTest.class
 com\dagacs\dto\TeacherAssignmentDTOValidationTest.class
