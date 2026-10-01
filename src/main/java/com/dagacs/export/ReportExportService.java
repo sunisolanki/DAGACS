@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -314,9 +315,9 @@ public class ReportExportService {
 
         List<String> headers = new ArrayList<>(List.of("Enrollment No.", "Student Name"));
         for (com.dagacs.dto.StudentWiseColumnDTO col : report.getColumns()) {
-            headers.add(col.getDate() + " | " + col.getLecturePeriod());
+            headers.add(sessionColumnLabel(col));
         }
-        headers.addAll(List.of("Total Present", "Total Classes", "Percentage"));
+        headers.addAll(List.of("Present", "Total Classes", "Percentage"));
 
         List<List<Object>> rows = new ArrayList<>();
         for (com.dagacs.dto.StudentWiseRowDTO row : report.getRows()) {
@@ -338,36 +339,69 @@ public class ReportExportService {
         if (!withLegend.isEmpty()) {
             List<Object> legend = new ArrayList<>();
             legend.add("Legend");
-            legend.add("P = Present, A = Absent (unmarked counts as absent)");
+            legend.add("P = Present    |    A = Absent    |    Unmarked/Missing = A");
             while (legend.size() < headers.size()) {
                 legend.add("");
             }
             withLegend.add(legend);
         }
 
-        // Three-row title block:
-        //   DAGACS - Teacher Attendance Report
-        //   Teacher: <name>
-        //   Subject: <x>    Section: <y>    Date Range: <a> to <b>
+        // Header block:
+        //   DAGACS
+        //   STUDENT ATTENDANCE REPORT
+        //   Subject / Section / Batch / Teacher / Date Range
         return new ExportData(
-                "DAGACS - Teacher Attendance Report",
-                "Teacher: " + teacher.getFullName(),
+                "DAGACS",
+                "STUDENT ATTENDANCE REPORT",
                 "Attendance Report",
                 headers,
                 withLegend,
-                List.of("Subject: " + report.getSubjectName()
-                        + "    Section: " + classLabel(report)
-                        + "    Date Range: " + dateRangeText(startDate, endDate)),
+                List.of(
+                        "Subject: " + report.getSubjectName(),
+                        "Section: " + sectionLabel(report),
+                        "Batch: " + batchLabel(report),
+                        "Teacher: " + teacher.getFullName(),
+                        "Date Range: " + dateRangeText(startDate, endDate)),
                 // One column per conducted session date: keep it landscape so
                 // no date column is ever clipped.
                 true);
     }
 
-    private static String classLabel(StudentWiseReportDTO report) {
-        if (report.getSectionName() != null) {
-            return report.getSectionName();
+    /**
+     * Column header for one conducted session, e.g. {@code 12-Aug-2026 (P1)}.
+     *
+     * <p>Two conducted sessions on the same date with different lecture periods
+     * therefore produce two clearly distinct columns and neither overwrites the
+     * other.
+     */
+    private static String sessionColumnLabel(com.dagacs.dto.StudentWiseColumnDTO col) {
+        String pretty = formatSessionDate(col.getDate());
+        String period = col.getLecturePeriod();
+        if (period == null || period.isBlank()) {
+            return pretty;
         }
-        return report.getBatchCode() != null ? "Batch " + report.getBatchCode() : "-";
+        return pretty + " (" + period + ")";
+    }
+
+    /** Renders an ISO {@code yyyy-MM-dd} as {@code dd-MMM-yyyy}, year included. */
+    private static String formatSessionDate(String isoDate) {
+        if (isoDate == null || isoDate.isBlank()) {
+            return "";
+        }
+        try {
+            return LocalDate.parse(isoDate)
+                    .format(DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.ROOT));
+        } catch (RuntimeException e) {
+            return isoDate;
+        }
+    }
+
+    private static String sectionLabel(StudentWiseReportDTO report) {
+        return report.getSectionName() != null ? report.getSectionName() : "-";
+    }
+
+    private static String batchLabel(StudentWiseReportDTO report) {
+        return report.getBatchCode() != null ? report.getBatchCode() : "-";
     }
 
     /**

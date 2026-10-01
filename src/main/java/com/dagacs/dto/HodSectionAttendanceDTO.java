@@ -15,6 +15,13 @@ public class HodSectionAttendanceDTO {
 
     private String sectionCode;
 
+    /** Academic context; null on the frozen department-wide query. */
+    private String academicSessionName;
+
+    private String programName;
+
+    private String semesterName;
+
     private Long studentCount;
 
     private Long presentCount;

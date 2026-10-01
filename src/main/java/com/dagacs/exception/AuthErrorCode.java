@@ -27,5 +27,13 @@ public final class AuthErrorCode {
     public static final String HOD_NOT_DESIGNATED = "HOD_NOT_DESIGNATED";
     public static final String HOD_NO_DEPARTMENT = "HOD_NO_DEPARTMENT";
 
+    /**
+     * A supplied academic-hierarchy identifier does not belong to the
+     * authenticated HOD's department, or the requested combination is not
+     * internally consistent. Paired with HTTP 403 by
+     * {@code HodHierarchyService}; never returned on a successful response.
+     */
+    public static final String HOD_SCOPE_VIOLATION = "HOD_SCOPE_VIOLATION";
+
     public static final String STUDENT_PASSWORD_CHANGE_REQUIRED = "STUDENT_PASSWORD_CHANGE_REQUIRED";
 }

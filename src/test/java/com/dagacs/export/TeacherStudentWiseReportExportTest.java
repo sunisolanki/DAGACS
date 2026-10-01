@@ -155,11 +155,11 @@ class TeacherStudentWiseReportExportTest {
         assertEquals("Enrollment No.", headers.get(0));
         assertEquals("Student Name", headers.get(1));
         // One column per CONDUCTED session date, in chronological order.
-        assertEquals("2026-08-12 | LP1", headers.get(2));
-        assertEquals("2026-08-14 | LP1", headers.get(3));
-        assertEquals("2026-08-18 | LP1", headers.get(4));
+        assertEquals("12-Aug-2026 (LP1)", headers.get(2));
+        assertEquals("14-Aug-2026 (LP1)", headers.get(3));
+        assertEquals("18-Aug-2026 (LP1)", headers.get(4));
         // Final three columns.
-        assertEquals("Total Present", headers.get(5));
+        assertEquals("Present", headers.get(5));
         assertEquals("Total Classes", headers.get(6));
         assertEquals("Percentage", headers.get(7));
         assertEquals(8, headers.size());
@@ -231,23 +231,42 @@ class TeacherStudentWiseReportExportTest {
     }
 
     @Test
-    @DisplayName("the three-row title block carries report, teacher, subject, section and range")
+    @DisplayName("the header block carries DAGACS, the report name, subject, section, batch, teacher and range")
     void register_metadata() {
         stubReport();
         ExportData data = capture(ExportFormat.XLSX);
 
-        // Row 1: the report identity.
-        assertTrue(data.title().contains("DAGACS"), data.title());
-        assertTrue(data.title().contains("Teacher Attendance Report"), data.title());
-        // Row 2: the teacher.
-        assertEquals("Teacher: Asha Teacher", data.subtitle());
-        // Row 3: subject, section and date range.
-        assertEquals(1, data.metaLines().size(), data.metaLines().toString());
-        String meta = data.metaLines().get(0);
-        assertTrue(meta.contains("Subject: DBMS"), meta);
-        assertTrue(meta.contains("Section: CSE-A"), meta);
-        assertTrue(meta.contains("2026-08-12"), meta);
-        assertTrue(meta.contains("2026-09-12"), meta);
+        assertEquals("DAGACS", data.title());
+        assertEquals("STUDENT ATTENDANCE REPORT", data.subtitle());
+
+        List<String> meta = data.metaLines();
+        assertEquals(5, meta.size(), meta.toString());
+        assertEquals("Subject: DBMS", meta.get(0));
+        assertEquals("Section: CSE-A", meta.get(1));
+        // Section-scoped report: no batch, rendered explicitly as a dash.
+        assertEquals("Batch: -", meta.get(2));
+        assertEquals("Teacher: Asha Teacher", meta.get(3));
+        assertTrue(meta.get(4).contains("2026-08-12"), meta.get(4));
+        assertTrue(meta.get(4).contains("2026-09-12"), meta.get(4));
+    }
+
+    @Test
+    @DisplayName("there is exactly one Present / Total Classes / Percentage trio, never duplicated")
+    void register_noDuplicateTrailingColumns() {
+        stubReport();
+        ExportData data = capture(ExportFormat.XLSX);
+
+        assertEquals(1, count(data.headers(), "Present"));
+        assertEquals(1, count(data.headers(), "Total Classes"));
+        assertEquals(1, count(data.headers(), "Percentage"));
+        // The old buggy shape was "... | Present | Total Classes | Percentage
+        // | Total Present | Total Classes | Percentage".
+        assertEquals(8, data.headers().size(),
+                "identity + 3 sessions + 3 totals: " + data.headers());
+    }
+
+    private static long count(List<String> values, String target) {
+        return values.stream().filter(target::equals).count();
     }
 
     @Test
@@ -262,6 +281,7 @@ class TeacherStudentWiseReportExportTest {
                 .orElseThrow(() -> new AssertionError("expected a P = Present / A = Absent legend row"));
         assertTrue(String.valueOf(legend.get(1)).contains("P = Present"));
         assertTrue(String.valueOf(legend.get(1)).contains("A = Absent"));
+        assertTrue(String.valueOf(legend.get(1)).contains("Unmarked/Missing = A"));
     }
 
     @Test
@@ -273,9 +293,8 @@ class TeacherStudentWiseReportExportTest {
         // The PDF keeps the per-session date columns, so it shows the same
         // attendance detail as the web report and the spreadsheet.
         assertEquals(List.of("Enrollment No.", "Student Name",
-                "2026-08-12 | LP1", "2026-08-14 | LP1", "2026-08-18 | LP1",
-                "Total Present", "Total Classes", "Percentage"), data.headers());
-
+                "12-Aug-2026 (LP1)", "14-Aug-2026 (LP1)", "18-Aug-2026 (LP1)",
+                "Present", "Total Classes", "Percentage"), data.headers());
         List<Object> row = data.rows().get(0);
         assertEquals("DAGACS001", row.get(0));
         assertEquals("Rahul Sharma", row.get(1));

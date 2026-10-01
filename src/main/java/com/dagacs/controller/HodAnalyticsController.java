@@ -9,7 +9,9 @@ import com.dagacs.dto.HodStudentAttendanceDTO;
 import com.dagacs.dto.HodSubjectAttendanceDTO;
 import com.dagacs.exception.AuthException;
 import com.dagacs.exception.InvalidDateRangeException;
+import com.dagacs.service.HodAcademicSelection;
 import com.dagacs.service.HodAnalyticsService;
+import com.dagacs.service.HodHierarchyService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,10 +25,20 @@ import java.util.List;
 
 /**
  * Read-only M6.2 HOD analytics API. All identity/scope is derived from the JWT
- * (see {@link com.dagacs.security.AuthenticatedHodResolver}); the only accepted
- * request parameters are optional date ranges and, for rollups, the
- * monthly|quarterly type. Semester rollup is intentionally rejected because it
- * is NOT DERIVABLE from the current schema (M6.2 plan, section 10).
+ * (see {@link com.dagacs.security.AuthenticatedHodResolver}).
+ *
+ * <p><b>M12 (HOD academic context).</b> The four list endpoints additionally
+ * accept an optional academic context ({@code academicSessionId},
+ * {@code programId}, {@code semesterId}, {@code sectionId}). Every supplied id
+ * is proven to belong to the authenticated HOD's department before use and an
+ * out-of-department id is rejected with 403; the department itself is never
+ * accepted as a parameter. When no context is supplied the original frozen
+ * department-wide query runs unchanged, so existing behaviour and callers are
+ * fully preserved.</p>
+ *
+ * <p>Date ranges are optional and inclusive. Rollups remain monthly/quarterly
+ * only. Semester rollup is intentionally rejected because it is NOT DERIVABLE
+ * from the current schema (M6.2 plan, section 10).</p>
  */
 @RestController
 @RequestMapping("/api/hod")
@@ -37,9 +49,12 @@ public class HodAnalyticsController {
     private static final String TYPE_QUARTERLY = "quarterly";
 
     private final HodAnalyticsService hodAnalyticsService;
+    private final HodHierarchyService hodHierarchyService;
 
-    public HodAnalyticsController(HodAnalyticsService hodAnalyticsService) {
+    public HodAnalyticsController(HodAnalyticsService hodAnalyticsService,
+                                  HodHierarchyService hodHierarchyService) {
         this.hodAnalyticsService = hodAnalyticsService;
+        this.hodHierarchyService = hodHierarchyService;
     }
 
     @GetMapping("/dashboard")
@@ -57,8 +72,17 @@ public class HodAnalyticsController {
             @RequestParam(name = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId) {
         validateDateRange(startDate, endDate);
+        HodAcademicSelection selection = selection(academicSessionId, programId, semesterId, sectionId);
+        if (selection.isPresent()) {
+            return ResponseEntity.ok(hodHierarchyService.getSectionAttendance(
+                    selection, toCanonicalString(startDate), toCanonicalString(endDate)));
+        }
         return ResponseEntity.ok(hodAnalyticsService.getSectionAttendance(startDate, endDate));
     }
 
@@ -67,8 +91,17 @@ public class HodAnalyticsController {
             @RequestParam(name = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId) {
         validateDateRange(startDate, endDate);
+        HodAcademicSelection selection = selection(academicSessionId, programId, semesterId, sectionId);
+        if (selection.isPresent()) {
+            return ResponseEntity.ok(hodHierarchyService.getSubjectAttendance(
+                    selection, toCanonicalString(startDate), toCanonicalString(endDate)));
+        }
         return ResponseEntity.ok(hodAnalyticsService.getSubjectAttendance(startDate, endDate));
     }
 
@@ -77,8 +110,17 @@ public class HodAnalyticsController {
             @RequestParam(name = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId) {
         validateDateRange(startDate, endDate);
+        HodAcademicSelection selection = selection(academicSessionId, programId, semesterId, sectionId);
+        if (selection.isPresent()) {
+            return ResponseEntity.ok(hodHierarchyService.getStudentAttendance(
+                    selection, toCanonicalString(startDate), toCanonicalString(endDate)));
+        }
         return ResponseEntity.ok(hodAnalyticsService.getStudentAttendance(startDate, endDate));
     }
 
@@ -87,8 +129,17 @@ public class HodAnalyticsController {
             @RequestParam(name = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId) {
         validateDateRange(startDate, endDate);
+        HodAcademicSelection selection = selection(academicSessionId, programId, semesterId, sectionId);
+        if (selection.isPresent()) {
+            return ResponseEntity.ok(hodHierarchyService.getLowAttendance(
+                    selection, toCanonicalString(startDate), toCanonicalString(endDate)));
+        }
         return ResponseEntity.ok(hodAnalyticsService.getLowAttendance(startDate, endDate));
     }
 
@@ -114,6 +165,17 @@ public class HodAnalyticsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         validateDateRange(startDate, endDate);
         return ResponseEntity.ok(hodAnalyticsService.getAuditLogs(startDate, endDate));
+    }
+
+    private static HodAcademicSelection selection(Long academicSessionId,
+                                                 Long programId,
+                                                 Long semesterId,
+                                                 Long sectionId) {
+        return new HodAcademicSelection(academicSessionId, programId, semesterId, sectionId);
+    }
+
+    private static String toCanonicalString(LocalDate date) {
+        return date == null ? null : date.toString();
     }
 
     private static void validateDateRange(LocalDate startDate, LocalDate endDate) {

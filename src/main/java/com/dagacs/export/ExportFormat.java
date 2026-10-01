@@ -6,5 +6,10 @@ package com.dagacs.export;
  */
 public enum ExportFormat {
     XLSX,
-    PDF
+    PDF;
+
+    /** The file extension, with no dot. */
+    public String extension() {
+        return this == PDF ? "pdf" : "xlsx";
+    }
 }
