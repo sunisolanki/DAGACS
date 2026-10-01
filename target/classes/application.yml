@@ -55,6 +55,13 @@ app:
     student-password: ${DAGACS_STUDENT_PASSWORD:Student@123}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5500}
+  # Phase 4A: report branding. Only the INSTITUTION name is configurable - it is
+  # not stored in the database. The department line is never configured here: it
+  # is always the real Department.name of the authenticated HOD, so a report can
+  # never claim a department the HOD does not belong to.
+  report:
+    branding:
+      institution-name: ${DAGACS_INSTITUTION_NAME:DAGACS}
   # M9.6 M: login rate limiting - conservative, instance-local, ephemeral.
   # Only FAILED (401) logins count; a successful login clears the email counter.
   # Env-overridable, each placeholder carries a development-safe default.

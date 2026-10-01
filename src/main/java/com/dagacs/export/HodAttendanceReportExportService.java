@@ -98,7 +98,7 @@ public class HodAttendanceReportExportService {
     public ExportedFile exportOverview(ExportFormat format, HodAcademicSelection selection,
                                        LocalDate startDate, LocalDate endDate) {
         ExportData data = overviewData(selection, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data),
+        return new ExportedFile(render(format, data, HodReportStyles.overview()),
                 overviewFileName(format, data, startDate, endDate));
     }
 
@@ -108,7 +108,7 @@ public class HodAttendanceReportExportService {
                                       LocalDate startDate, LocalDate endDate) {
         ExportData data = studentData(selection, studentId, subjectId,
                 iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data),
+        return new ExportedFile(render(format, data, HodReportStyles.student()),
                 studentFileName(format, data, enrollmentOf(data), startDate, endDate));
     }
 
@@ -117,7 +117,7 @@ public class HodAttendanceReportExportService {
                                       Long subjectId,
                                       LocalDate startDate, LocalDate endDate) {
         ExportData data = subjectData(selection, subjectId, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data),
+        return new ExportedFile(render(format, data, HodReportStyles.subject()),
                 subjectFileName(format, data, subjectCodeOf(data), startDate, endDate));
     }
 
@@ -125,7 +125,7 @@ public class HodAttendanceReportExportService {
     public ExportedFile exportLow(ExportFormat format, HodAcademicSelection selection,
                                   LocalDate startDate, LocalDate endDate) {
         ExportData data = lowData(selection, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data),
+        return new ExportedFile(render(format, data, HodReportStyles.lowAttendance()),
                 lowAttendanceFileName(format, data, startDate, endDate));
     }
 
@@ -319,13 +319,17 @@ public class HodAttendanceReportExportService {
                     percentageText(subject.getPercentage())));
         }
         // The total row is the DTO's own figure, never a re-derivation.
+        int totalRowIndex = rows.size();
         rows.add(List.of("", "TOTAL",
                 zeroSafe(detail.getTotalPresent()),
                 zeroSafe(detail.getTotalClasses()),
                 percentageText(detail.getOverallPercentage())));
 
+        // Phase 4B marks the total so the renderer can emphasise it. This is
+        // presentation only: the row's values are the DTO's, exactly as in 4A.
         return new ExportData(header.institution(), header.reportTitle(),
-                "Student Attendance", headers, rows, header.metaLines(), false);
+                "Student Attendance", headers, rows, header.metaLines(), false)
+                .withTotalRows(totalRowIndex);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -408,8 +412,24 @@ public class HodAttendanceReportExportService {
      * a fabricated 0% entry would invent data.</p>
      */
     ExportData lowData(HodAcademicSelection selection, String startDate, String endDate) {
-        HodLowAttendanceReportDTO report = attendanceReportService
-                .getLowAttendance(selection, startDate, endDate);
+        return lowData(attendanceReportService.getLowAttendance(selection, startDate, endDate),
+                startDate, endDate);
+    }
+
+    /**
+     * Arranges an already-loaded low-attendance report onto the export table.
+     *
+     * <p>Phase 4B: separated from the loading so the Context Pack - which needs
+     * this arrangement for one of its five sheets - can hand over the report it
+     * already fetched instead of making the database produce it a second time.
+     * Re-querying per sheet is exactly the per-sheet N+1 this project forbids.</p>
+     *
+     * <p>Pure arrangement: the threshold, the ranking and every percentage come
+     * from the DTO, so the Pack's sheet cannot disagree with the standalone
+     * report.</p>
+     */
+    ExportData lowData(HodLowAttendanceReportDTO report,
+                       String startDate, String endDate) {
         HodAttendanceContextDTO context = report.getContext();
         LocalDateTime generatedAt = LocalDateTime.now();
 
@@ -475,10 +495,27 @@ public class HodAttendanceReportExportService {
     // ═══════════════════════════════════════════════════════════════════════
 
     private byte[] render(ExportFormat format, ExportData data) {
-        // Phase 4A keeps the frozen generators exactly as they are; the
-        // professional print/PDF chrome is the additive option overloads in 4B/4C.
+        return render(format, data, ExcelStyleOptions.defaults());
+    }
+
+    /**
+     * Renders one report in the requested format, from the single
+     * {@link ExportData} instance both formats share.
+     *
+     * <p>Phase 4B applies the professional Excel formatting. The PDF path is
+     * deliberately untouched: {@code PdfReportGenerator} is Phase 4C's subject,
+     * and its chrome, pagination and page numbering are explicitly out of scope
+     * here. Keeping the two branches separate is what makes that boundary
+     * enforceable rather than aspirational.</p>
+     *
+     * <p>The data is identical in both formats, which is what guarantees an Excel
+     * file and a PDF of the same report can never disagree about a number.</p>
+     */
+    private byte[] render(ExportFormat format, ExportData data, ExcelStyleOptions options) {
         return switch (format) {
-            case XLSX -> excelGenerator.generate(data, true);
+            case XLSX -> excelGenerator.generate(data, options);
+            // Phase 4A keeps the frozen generators exactly as they are; the
+            // professional print/PDF chrome is Phase 4C's scope.
             case PDF -> pdfGenerator.generate(data);
         };
     }

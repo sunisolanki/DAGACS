@@ -10,6 +10,8 @@ import com.dagacs.security.AuthenticatedHodResolver;
 import com.dagacs.service.HodAcademicSelection;
 import com.dagacs.service.HodAttendanceReportService;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -25,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -297,7 +300,20 @@ class HodAttendanceMatrixExportTest {
             assertEquals("30 / 35", text(first, 3));
             assertEquals(62.0, first.getCell(4).getNumericCellValue(), 0.0001);
             assertEquals(75.0, first.getCell(5).getNumericCellValue(), 0.0001);
-            assertEquals("82.67%", text(first, 6));
+            // Phase 4B: the overall column is a real numeric cell formatted as a
+            // percentage, so a HOD can sort and filter it. Asserted three ways -
+            // numeric storage, the 0.00% format that makes it display correctly,
+            // and the value formatted back to exactly the "82.67%" Phase 4A
+            // printed as text. The displayed figure is therefore provably
+            // unchanged; only its Excel type improved.
+            assertEquals(CellType.NUMERIC, first.getCell(6).getCellType(),
+                    "the overall percentage must be sortable as a number");
+            assertEquals(0.8267, first.getCell(6).getNumericCellValue(), 0.0001);
+            assertEquals("0.00%", first.getCell(6).getCellStyle().getDataFormatString());
+            // DataFormatter applies the cell's own format, so this is what a HOD
+            // actually sees in Excel - and it must equal the Phase 4A text.
+            assertEquals("82.67%",
+                    new DataFormatter(Locale.ROOT).formatCellValue(first.getCell(6)));
 
             Row zero = sheet.getRow(header.getRowNum() + 3);
             assertEquals("CS2025003", text(zero, 0));

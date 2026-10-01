@@ -20,21 +20,40 @@ import java.util.List;
  *                  by the report rather than inferred from the column count, so
  *                  a narrow report is never silently rotated and a wide one is
  *                  never silently clipped.
+ * @param totalRowIndices indices into {@code rows} that are total rows rather
+ *                  than data. Phase 4B: purely presentational - the renderer
+ *                  bolds and tints them when the report asks for it, and the
+ *                  values themselves are untouched. Empty by default, so every
+ *                  report that predates Phase 4B is unaffected.
  */
 public record ExportData(String title, String subtitle, String sheetName,
                          List<String> headers, List<List<Object>> rows,
-                         List<String> metaLines, boolean landscape) {
+                         List<String> metaLines, boolean landscape,
+                         List<Integer> totalRowIndices) {
+
+    /** The shape Phase 3 and Phase 4A used: no total rows are marked. */
+    public ExportData(String title, String subtitle, String sheetName,
+                      List<String> headers, List<List<Object>> rows,
+                      List<String> metaLines, boolean landscape) {
+        this(title, subtitle, sheetName, headers, rows, metaLines, landscape, List.of());
+    }
 
     /** Convenience constructor for reports with no extra metadata lines. */
     public ExportData(String title, String subtitle, String sheetName,
                       List<String> headers, List<List<Object>> rows) {
-        this(title, subtitle, sheetName, headers, rows, List.of(), false);
+        this(title, subtitle, sheetName, headers, rows, List.of(), false, List.of());
     }
 
     /** Convenience constructor for reports that only need extra metadata lines. */
     public ExportData(String title, String subtitle, String sheetName,
                       List<String> headers, List<List<Object>> rows,
                       List<String> metaLines) {
-        this(title, subtitle, sheetName, headers, rows, metaLines, false);
+        this(title, subtitle, sheetName, headers, rows, metaLines, false, List.of());
+    }
+
+    /** Copy of this report with the given rows marked as totals. */
+    public ExportData withTotalRows(Integer... indices) {
+        return new ExportData(title, subtitle, sheetName, headers, rows, metaLines, landscape,
+                indices == null ? List.of() : List.of(indices));
     }
 }

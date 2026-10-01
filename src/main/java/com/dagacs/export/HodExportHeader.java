@@ -133,6 +133,10 @@ public class HodExportHeader {
      * placeholder, if the department cannot be resolved. In practice
      * {@link AuthenticatedHodResolver} already rejects a HOD with no department
      * with a 401 before any of this runs.</p>
+     *
+     * <p>The resolver memoises the authenticated HOD for the duration of a request,
+     * so this is free: the same identity the report service already resolved to
+     * authorize the data is reused here rather than looked up a second time.</p>
      */
     public String departmentText() {
         try {

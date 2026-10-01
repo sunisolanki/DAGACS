@@ -10,6 +10,7 @@ import com.dagacs.exception.InvalidDateRangeException;
 import com.dagacs.export.ExportFormat;
 import com.dagacs.export.HodAttendanceMatrixExportService;
 import com.dagacs.export.HodAttendanceReportExportService;
+import com.dagacs.export.HodContextPackExportService;
 import com.dagacs.service.HodAcademicSelection;
 import com.dagacs.service.HodAttendanceReportService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -94,13 +95,16 @@ public class HodAttendanceReportController {
     private final HodAttendanceReportService attendanceReportService;
     private final HodAttendanceMatrixExportService matrixExportService;
     private final HodAttendanceReportExportService reportExportService;
+    private final HodContextPackExportService contextPackExportService;
 
     public HodAttendanceReportController(HodAttendanceReportService attendanceReportService,
                                          HodAttendanceMatrixExportService matrixExportService,
-                                         HodAttendanceReportExportService reportExportService) {
+                                         HodAttendanceReportExportService reportExportService,
+                                         HodContextPackExportService contextPackExportService) {
         this.attendanceReportService = attendanceReportService;
         this.matrixExportService = matrixExportService;
         this.reportExportService = reportExportService;
+        this.contextPackExportService = contextPackExportService;
     }
 
     @GetMapping("/overview")
@@ -410,6 +414,47 @@ public class HodAttendanceReportController {
             @RequestParam(name = "sectionId", required = false) Long sectionId) {
         return ResponseEntity.ok(attendanceReportService.resolveContextMetadata(
                 selection(academicSessionId, programId, semesterId, sectionId)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 4B - the Context Pack
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * One workbook holding the reports of this academic context.
+     *
+     * <p><b>Phase 4B.</b> Five sheets - Executive Summary, Attendance Matrix,
+     * Low Attendance, Subject Summary, Student Summary - each produced by the same
+     * canonical service methods the standalone exports use, so the Pack cannot
+     * disagree with any single report a HOD already trusts.</p>
+     *
+     * <p><b>The same authorization, not a second one.</b> The endpoint takes only
+     * the academic-selection parameters the Phase 4A context reports take. No
+     * department, student or subject identity is accepted from the client, and
+     * the department is still derived from the JWT inside the service, so the
+     * cross-department and cross-context rejections of Phase 4A apply to the Pack
+     * unchanged. A Pack is also strictly narrower than any Phase 4A endpoint: it
+     * cannot reach one student's report, only the whole authorized context.</p>
+     *
+     * <p>XLSX only for now. A multi-sheet PDF needs pagination and print chrome,
+     * which is Phase 4C's scope, and shipping one before that exists would mean
+     * designing it twice.</p>
+     */
+    @GetMapping("/context-pack/export.xlsx")
+    public ResponseEntity<byte[]> exportContextPack(
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId,
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        HodContextPackExportService.ExportedPack pack = contextPackExportService.export(
+                selection(academicSessionId, programId, semesterId, sectionId),
+                startDate, endDate);
+        return attachment(pack.bytes(), XLSX_MEDIA_TYPE, pack.fileName());
     }
 
     private static ResponseEntity<byte[]> attachment(byte[] body, String mediaType, String fileName) {

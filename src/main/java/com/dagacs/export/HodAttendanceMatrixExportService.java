@@ -92,8 +92,21 @@ public class HodAttendanceMatrixExportService {
     public byte[] export(ExportFormat format, HodAcademicSelection selection, Long subjectId,
                          String startDate, String endDate) {
         ExportData data = buildMatrixData(selection, subjectId, startDate, endDate);
+        return render(format, data);
+    }
+
+    /**
+     * Renders the cross-tab.
+     *
+     * <p>Phase 4B gives the spreadsheet the same professional formatting the
+     * professional layout asks for: landscape and fit-to-width, because a
+     * cross-tab with dynamic subject columns is unreadable clipped to a portrait
+     * page. The PDF branch is unchanged - its chrome and pagination are Phase
+     * 4C's scope.</p>
+     */
+    private byte[] render(ExportFormat format, ExportData data) {
         return switch (format) {
-            case XLSX -> excelGenerator.generate(data, true);
+            case XLSX -> excelGenerator.generate(data, HodReportStyles.matrix());
             case PDF -> pdfGenerator.generate(data);
         };
     }
@@ -124,11 +137,36 @@ public class HodAttendanceMatrixExportService {
      */
     ExportData buildMatrixData(HodAcademicSelection selection, Long subjectId,
                                String startDate, String endDate) {
-        HodAttendanceMatrixDTO matrix = attendanceReportService.getMatrix(
+        return matrixData(loadMatrix(selection, subjectId, startDate, endDate),
+                subjectId, startDate, endDate);
+    }
+
+    /**
+     * The matrix for the given selection, always unpaged.
+     *
+     * <p>Phase 4B: separated from the arrangement so a caller that already holds
+     * the matrix - the Context Pack, which needs it for two different sheets -
+     * can arrange both without asking the database for it twice. An export that
+     * re-queried per sheet would quietly become the per-sheet N+1 this project
+     * forbids.</p>
+     */
+    HodAttendanceMatrixDTO loadMatrix(HodAcademicSelection selection, Long subjectId,
+                                      String startDate, String endDate) {
+        return attendanceReportService.getMatrix(
                 selection, subjectId, startDate, endDate,
                 0, UNPAGED_SIZE,
                 HodAttendanceReportService.SORT_ENROLLMENT_NUMBER, "asc");
+    }
 
+    /**
+     * Arranges an already-loaded matrix onto the generic export table.
+     *
+     * <p>Pure arrangement: it receives the canonical DTO and adds no query and no
+     * arithmetic of its own, which is what lets the standalone matrix report and
+     * the Context Pack's cross-tab sheet be provably the same report.</p>
+     */
+    ExportData matrixData(HodAttendanceMatrixDTO matrix, Long subjectId,
+                          String startDate, String endDate) {
         HodAttendanceContextDTO context = matrix.getContext();
         List<HodAttendanceMatrixColumnDTO> subjects = matrix.getSubjects() == null
                 ? List.of()
