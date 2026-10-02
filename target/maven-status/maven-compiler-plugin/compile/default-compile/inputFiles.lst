@@ -12,6 +12,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\config\TeacherHodSchemaMigration.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\SubjectController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\HodExportFileNames.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\DepartmentDTO.java
+D:\DAGACS\backend\src\main\java\com\dagacs\export\HodReportPdfStyles.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\StudentAttendanceService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\HodDesignationRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\TeacherRepository.java
@@ -23,6 +24,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodReportExportController.
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\AttendanceUpdateRequestDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\TeacherReportController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\AcademicSessionRepository.java
+D:\DAGACS\backend\src\main\java\com\dagacs\export\PdfRenderedDocument.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\BatchRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AttendanceAuditLogService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AttendanceCalculationService.java
@@ -117,6 +119,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\controller\TeacherAssignmentControlle
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\StudentDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\UserRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\entity\AcademicSession.java
+D:\DAGACS\backend\src\main\java\com\dagacs\export\PdfStyleOptions.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\HodLowAttendanceSubjectDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\dto\SubjectAttendanceDTO.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\ExcelReportGenerator.java
@@ -138,6 +141,7 @@ D:\DAGACS\backend\src\main\java\com\dagacs\export\HodReportStyles.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\AccountProvisioningService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\controller\HodAttendanceReportController.java
 D:\DAGACS\backend\src\main\java\com\dagacs\config\HodHierarchyIndexSchemaMigration.java
+D:\DAGACS\backend\src\main\java\com\dagacs\export\PdfPageFooter.java
 D:\DAGACS\backend\src\main\java\com\dagacs\repository\HodAttendanceReportRepository.java
 D:\DAGACS\backend\src\main\java\com\dagacs\service\BatchService.java
 D:\DAGACS\backend\src\main\java\com\dagacs\export\HodAttendanceReportExportService.java

@@ -98,7 +98,8 @@ public class HodAttendanceReportExportService {
     public ExportedFile exportOverview(ExportFormat format, HodAcademicSelection selection,
                                        LocalDate startDate, LocalDate endDate) {
         ExportData data = overviewData(selection, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data, HodReportStyles.overview()),
+        return new ExportedFile(
+                render(format, data, HodReportStyles.overview(), HodReportPdfStyles.overview()),
                 overviewFileName(format, data, startDate, endDate));
     }
 
@@ -108,7 +109,8 @@ public class HodAttendanceReportExportService {
                                       LocalDate startDate, LocalDate endDate) {
         ExportData data = studentData(selection, studentId, subjectId,
                 iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data, HodReportStyles.student()),
+        return new ExportedFile(
+                render(format, data, HodReportStyles.student(), HodReportPdfStyles.student()),
                 studentFileName(format, data, enrollmentOf(data), startDate, endDate));
     }
 
@@ -117,7 +119,8 @@ public class HodAttendanceReportExportService {
                                       Long subjectId,
                                       LocalDate startDate, LocalDate endDate) {
         ExportData data = subjectData(selection, subjectId, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data, HodReportStyles.subject()),
+        return new ExportedFile(
+                render(format, data, HodReportStyles.subject(), HodReportPdfStyles.subject()),
                 subjectFileName(format, data, subjectCodeOf(data), startDate, endDate));
     }
 
@@ -125,7 +128,9 @@ public class HodAttendanceReportExportService {
     public ExportedFile exportLow(ExportFormat format, HodAcademicSelection selection,
                                   LocalDate startDate, LocalDate endDate) {
         ExportData data = lowData(selection, iso(startDate), iso(endDate));
-        return new ExportedFile(render(format, data, HodReportStyles.lowAttendance()),
+        return new ExportedFile(
+                render(format, data, HodReportStyles.lowAttendance(),
+                        HodReportPdfStyles.lowAttendance()),
                 lowAttendanceFileName(format, data, startDate, endDate));
     }
 
@@ -495,28 +500,33 @@ public class HodAttendanceReportExportService {
     // ═══════════════════════════════════════════════════════════════════════
 
     private byte[] render(ExportFormat format, ExportData data) {
-        return render(format, data, ExcelStyleOptions.defaults());
+        return render(format, data, ExcelStyleOptions.defaults(),
+                PdfStyleOptions.defaults());
     }
 
     /**
      * Renders one report in the requested format, from the single
      * {@link ExportData} instance both formats share.
      *
-     * <p>Phase 4B applies the professional Excel formatting. The PDF path is
-     * deliberately untouched: {@code PdfReportGenerator} is Phase 4C's subject,
-     * and its chrome, pagination and page numbering are explicitly out of scope
-     * here. Keeping the two branches separate is what makes that boundary
-     * enforceable rather than aspirational.</p>
+     * <p><b>The data is identical in both formats</b>, which is what guarantees an
+     * Excel file and a PDF of the same report can never disagree about a number.
      *
-     * <p>The data is identical in both formats, which is what guarantees an Excel
-     * file and a PDF of the same report can never disagree about a number.</p>
+     * <p>Phase 4B styles the spreadsheet; Phase 4C.2 styles the PDF through
+     * {@link PdfRenderedDocument}, which renders it and resolves
+     * {@code Page X of Y} in two passes over that <b>same</b> {@code ExportData}.
+     * The counting pass adds no database call, so enabling page numbers cannot
+     * change a HOD export's query cost - the property the Phase 4A query-count
+     * suite exists to protect.</p>
+     *
+     * <p>Only this HOD service opts in. The pre-existing M7.2 department reports
+     * and the Teacher exports render through {@code ReportExportService}, which
+     * keeps the frozen default.</p>
      */
-    private byte[] render(ExportFormat format, ExportData data, ExcelStyleOptions options) {
+    private byte[] render(ExportFormat format, ExportData data,
+                          ExcelStyleOptions excelOptions, PdfStyleOptions pdfOptions) {
         return switch (format) {
-            case XLSX -> excelGenerator.generate(data, options);
-            // Phase 4A keeps the frozen generators exactly as they are; the
-            // professional print/PDF chrome is Phase 4C's scope.
-            case PDF -> pdfGenerator.generate(data);
+            case XLSX -> excelGenerator.generate(data, excelOptions);
+            case PDF -> PdfRenderedDocument.render(pdfGenerator, data, pdfOptions);
         };
     }
 

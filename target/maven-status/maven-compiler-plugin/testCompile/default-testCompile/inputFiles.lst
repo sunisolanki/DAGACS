@@ -3,7 +3,9 @@ D:\DAGACS\backend\src\test\java\com\dagacs\dto\AttendanceAuditLogDTOTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\config\SectionSubjectSchemaMigrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\security\ParentAcademicReassignmentConsistencyIntegrationTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\TeacherAssignmentServiceTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\export\PdfFormattingTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\export\HodAttendanceMatrixExportTest.java
+D:\DAGACS\backend\src\test\java\com\dagacs\export\HodAttendancePdfLayoutTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\repository\SubjectOfferingRepositoryTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\export\ExcelReportGeneratorTest.java
 D:\DAGACS\backend\src\test\java\com\dagacs\service\SubjectServiceTest.java

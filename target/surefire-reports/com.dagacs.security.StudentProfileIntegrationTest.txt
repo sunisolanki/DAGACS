@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
 Test set: com.dagacs.security.StudentProfileIntegrationTest
 -------------------------------------------------------------------------------
-Tests run: 6, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.005 s <<< FAILURE! -- in com.dagacs.security.StudentProfileIntegrationTest
-com.dagacs.security.StudentProfileIntegrationTest.linkedStudent_seesOwnProfile_and_clientStudentIdCannotChangeIdentity -- Time elapsed: 0.201 s <<< FAILURE!
+Tests run: 6, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.368 s <<< FAILURE! -- in com.dagacs.security.StudentProfileIntegrationTest
+com.dagacs.security.StudentProfileIntegrationTest.linkedStudent_seesOwnProfile_and_clientStudentIdCannotChangeIdentity -- Time elapsed: 0.472 s <<< FAILURE!
 java.lang.AssertionError: No value at JSON path "$.email"
 	at org.springframework.test.util.JsonPathExpectationsHelper.evaluateJsonPath(JsonPathExpectationsHelper.java:302)
 	at org.springframework.test.util.JsonPathExpectationsHelper.assertValue(JsonPathExpectationsHelper.java:99)

@@ -27,6 +27,7 @@ com\dagacs\controller\HodAnalyticsController.class
 com\dagacs\entity\Semester.class
 com\dagacs\dto\AttendanceMarkItemDTO.class
 com\dagacs\dto\TeacherPasswordUpdateRequestDTO.class
+com\dagacs\export\PdfPageFooter.class
 com\dagacs\service\StudentImportService.class
 com\dagacs\export\ExportFormat.class
 com\dagacs\dto\StudentManagementRequestDTO.class
@@ -203,6 +204,7 @@ com\dagacs\dto\HodLowAttendanceDTO.class
 com\dagacs\entity\Program.class
 com\dagacs\dto\AttendanceMarkItemDTO$AttendanceMarkItemDTOBuilder.class
 com\dagacs\dto\StudentImportResult.class
+com\dagacs\export\PdfStyleOptions.class
 com\dagacs\repository\RoleRepository.class
 com\dagacs\dto\StudentImportResult$RowError$RowErrorBuilder.class
 com\dagacs\repository\AttendanceRecordAggregationRepository.class
@@ -276,6 +278,7 @@ com\dagacs\config\AcademicSessionLegacySchemaMigration$ColumnMeta.class
 com\dagacs\dto\ProgramDTO$ProgramDTOBuilder.class
 com\dagacs\entity\Department$DepartmentBuilder.class
 com\dagacs\dto\SectionDTO$SectionDTOBuilder.class
+com\dagacs\export\HodReportPdfStyles.class
 com\dagacs\security\LoginRateLimitFilter.class
 com\dagacs\export\HodContextPackExportService$ExportedPack.class
 com\dagacs\DagacsApplication.class
@@ -285,6 +288,7 @@ com\dagacs\dto\HodSubjectAttendanceDetailRowDTO.class
 com\dagacs\dto\StudentImportResult$StudentImportResultBuilder.class
 com\dagacs\repository\HodHierarchyRepository$SectionContextProjection.class
 com\dagacs\controller\ProgramController.class
+com\dagacs\export\PdfRenderedDocument.class
 com\dagacs\studentimport\StudentImportParser.class
 com\dagacs\repository\HodReportRepository$HodDailyLectureBatchAggregation.class
 com\dagacs\repository\TeacherReportRepository$TeacherSubjectAggregation.class

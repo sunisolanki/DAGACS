@@ -98,16 +98,22 @@ public class HodAttendanceMatrixExportService {
     /**
      * Renders the cross-tab.
      *
-     * <p>Phase 4B gives the spreadsheet the same professional formatting the
-     * professional layout asks for: landscape and fit-to-width, because a
-     * cross-tab with dynamic subject columns is unreadable clipped to a portrait
-     * page. The PDF branch is unchanged - its chrome and pagination are Phase
-     * 4C's scope.</p>
+     * <p>Phase 4B styles the spreadsheet; Phase 4C.2 styles the PDF through
+     * {@link PdfRenderedDocument}, which renders it and resolves
+     * {@code Page X of Y} in two passes over that same {@code ExportData}. The
+     * counting pass adds no database call.</p>
+     *
+     * <p><b>Orientation is not set here.</b> It still comes from
+     * {@link ExportData#landscape()}, which this report's builder sets to
+     * {@code true} because a cross-tab with dynamic subject columns is unreadable
+     * clipped to a portrait page. Forcing it through the options as well would be
+     * a second source of truth for a decision the data model already made.</p>
      */
     private byte[] render(ExportFormat format, ExportData data) {
         return switch (format) {
             case XLSX -> excelGenerator.generate(data, HodReportStyles.matrix());
-            case PDF -> pdfGenerator.generate(data);
+            case PDF -> PdfRenderedDocument.render(pdfGenerator, data,
+                    HodReportPdfStyles.matrix());
         };
     }
 
