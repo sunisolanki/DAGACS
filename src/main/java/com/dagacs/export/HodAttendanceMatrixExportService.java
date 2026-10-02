@@ -56,17 +56,24 @@ import java.util.Locale;
  * <p>An export is a file-generation operation, so it always requests the whole
  * student population of the context rather than one page of it.</p>
  *
- * <p>Known and explicitly deferred: the existing {@link PdfReportGenerator}
- * renders a plain table with no branding, headers or column-width tuning, so the
- * <b>PDF visual redesign is deferred to the 4B/4C sub-phases</b>. No new PDF code
- * is introduced here, and no fake or placeholder download is ever produced.</p>
- *
  * <p><b>Phase 4A.</b> The header block is now built by the shared
  * {@link HodExportHeader}, so the institution, the real department, the academic
  * context, the date range and the generation timestamp are identical to the other
  * four HOD reports. The existing attachment name is deliberately unchanged, so
  * every filename and header assertion in {@code HodAttendanceMatrixExportTest}
  * keeps holding.</p>
+ *
+ * <p><b>Phase 4C.2 - the PDF redesign that used to be deferred has since been
+ * done.</b> This paragraph previously said the visual redesign was deferred to
+ * the 4B/4C sub-phases; that is no longer true and the note is corrected here so
+ * the final Phase 4 record is not self-contradicting. The cross-tab PDF now goes
+ * through {@link PdfRenderedDocument} and {@link HodReportPdfStyles#matrix()},
+ * which gives it a running footer, {@code Page X of Y}, content-derived column
+ * widths, borders, a shaded header, intact rows and an explicit empty state. What
+ * has <b>not</b> changed is anything about the data, the column order, the values
+ * or the attachment name: no new PDF code is introduced here, the orientation is
+ * still the data model's decision, and no fake or placeholder download is ever
+ * produced.</p>
  */
 @Service
 public class HodAttendanceMatrixExportService {

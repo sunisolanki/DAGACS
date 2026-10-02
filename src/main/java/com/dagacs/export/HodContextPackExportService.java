@@ -48,6 +48,12 @@ import java.util.Locale;
  * show up here as a count that grows with the population, which
  * {@code HodAttendanceExportQueryCountIntegrationTest} asserts against.</p>
  *
+ * <h3>Phase 4C.3 - the same deliverable as a PDF</h3>
+ * <p>{@link #exportPdf} prints the same five reports, in the same order, into one
+ * PDF. It is not a second data path: both formats go through {@link #load}, so the
+ * same three service calls and the same five {@link ExportData} instances serve
+ * both. Only the presentation differs - see {@link HodContextPackPdfStyles}.</p>
+ *
  * <h3>No calculation happens here</h3>
  * <p>Every figure is already computed by the frozen canonical resolver and is
  * copied verbatim into the workbook. This class only chooses which columns to
@@ -86,17 +92,20 @@ public class HodContextPackExportService {
     private final HodAttendanceReportExportService reportExportService;
     private final HodExportHeader exportHeader;
     private final ExcelReportGenerator excelGenerator;
+    private final PdfSectionedReportGenerator pdfSectionedGenerator;
 
     public HodContextPackExportService(HodAttendanceReportService attendanceReportService,
                                        HodAttendanceMatrixExportService matrixExportService,
                                        HodAttendanceReportExportService reportExportService,
                                        HodExportHeader exportHeader,
-                                       ExcelReportGenerator excelGenerator) {
+                                       ExcelReportGenerator excelGenerator,
+                                       PdfSectionedReportGenerator pdfSectionedGenerator) {
         this.attendanceReportService = attendanceReportService;
         this.matrixExportService = matrixExportService;
         this.reportExportService = reportExportService;
         this.exportHeader = exportHeader;
         this.excelGenerator = excelGenerator;
+        this.pdfSectionedGenerator = pdfSectionedGenerator;
     }
 
     /**
@@ -112,18 +121,83 @@ public class HodContextPackExportService {
     /**
      * Builds the whole Context Pack.
      *
-     * <p>XLSX only: a multi-sheet PDF is deliberately Phase 4C's subject, and
-     * shipping a PDF pack now would mean designing pagination before the print
-     * chrome exists.</p>
+     * @see #exportPdf for the same deliverable as a single PDF
      */
     @Transactional(readOnly = true)
     public ExportedPack export(HodAcademicSelection selection,
                                LocalDate startDate, LocalDate endDate) {
+        Loaded loaded = load(selection, startDate, endDate);
+
+        List<ExportWorkbook.SheetSpec> sheets = List.of(
+                // Each sheet is looked up by its own published name rather than by
+                // position, so a sheet can never be paired with another sheet's
+                // formatting even if the load order is ever changed.
+                ExportWorkbook.sheet(SHEET_EXECUTIVE_SUMMARY,
+                        loaded.section(SHEET_EXECUTIVE_SUMMARY),
+                        executiveSummaryStyle()),
+                // The cross-tab reuses the matrix export's own arrangement, so
+                // the Pack's sheet is the standalone matrix report with the same
+                // landscape/fit-to-width layout.
+                ExportWorkbook.sheet(SHEET_MATRIX,
+                        loaded.section(SHEET_MATRIX),
+                        HodReportStyles.matrix()),
+                // Likewise the threshold report, so the Pack can never rank a
+                // student differently from the report a HOD already trusts.
+                ExportWorkbook.sheet(SHEET_LOW_ATTENDANCE,
+                        loaded.section(SHEET_LOW_ATTENDANCE),
+                        HodReportStyles.lowAttendance()),
+                ExportWorkbook.sheet(SHEET_SUBJECT_SUMMARY,
+                        loaded.section(SHEET_SUBJECT_SUMMARY),
+                        HodReportStyles.overview()),
+                ExportWorkbook.sheet(SHEET_STUDENT_SUMMARY,
+                        loaded.section(SHEET_STUDENT_SUMMARY),
+                        studentSummaryStyle()));
+
+        byte[] bytes = excelGenerator.generateWorkbook(new ExportWorkbook(sheets));
+        return new ExportedPack(bytes,
+                HodExportFileNames.build("ContextPack", loaded.contextSegment(),
+                        null, ExportFormat.XLSX, startDate, endDate));
+    }
+
+    /**
+     * Phase 4C.3: the same five reports as one PDF, in the same order, with a
+     * continuous page sequence and a real page size per section.
+     *
+     * <p><b>Exactly the same three service calls as the workbook.</b> Both formats
+     * go through {@link #load}, so the PDF cannot be a second, more expensive data
+     * path, and the two files are built from the very same
+     * {@link ExportData} instances - which is what makes it impossible for the
+     * spreadsheet and the PDF to disagree about a single attendance number.</p>
+     *
+     * <p>Rendering is pure CPU and happens after the data is loaded, so the extra
+     * pass that resolves {@code Page X of Y} adds no database cost at all.</p>
+     */
+    @Transactional(readOnly = true)
+    public ExportedPack exportPdf(HodAcademicSelection selection,
+                                  LocalDate startDate, LocalDate endDate) {
+        Loaded loaded = load(selection, startDate, endDate);
+        byte[] bytes = pdfSectionedGenerator.generate(
+                HodContextPackPdfStyles.sections(loaded.sectionData()));        return new ExportedPack(bytes,
+                HodExportFileNames.build("ContextPack", loaded.contextSegment(),
+                        null, ExportFormat.PDF, startDate, endDate));
+    }
+
+    /**
+     * Everything one Context Pack needs, loaded exactly once.
+     *
+     * <p><b>Three service calls, and always three.</b> {@code getOverview} feeds
+     * sections 1 and 4, the unpaged {@code getMatrix} feeds sections 2 and 5, and
+     * {@code getLowAttendance} feeds section 3. The five arrangements below add no
+     * query of their own - the matrix and low-attendance ones are handed the DTOs
+     * already loaded here - which is why the count is a constant in both student and
+     * subject count.</p>
+     */
+    private Loaded load(HodAcademicSelection selection,
+                        LocalDate startDate, LocalDate endDate) {
         String start = iso(startDate);
         String end = iso(endDate);
         LocalDateTime generatedAt = LocalDateTime.now();
 
-        // Three calls, reused across five sheets.
         HodAttendanceOverviewDTO overview =
                 attendanceReportService.getOverview(selection, start, end);
         HodAttendanceMatrixDTO matrix = attendanceReportService.getMatrix(
@@ -133,36 +207,46 @@ public class HodContextPackExportService {
         HodLowAttendanceReportDTO low =
                 attendanceReportService.getLowAttendance(selection, start, end);
 
-List<ExportWorkbook.SheetSpec> sheets = List.of(
-                // Three service calls, reused across five sheets. The matrix and
-                // low-attendance arrangements are handed the DTOs already loaded
-                // above rather than being asked to fetch their own, so no sheet
-                // costs an extra query.
-                ExportWorkbook.sheet(SHEET_EXECUTIVE_SUMMARY,
+        return new Loaded(
+                List.of(
                         executiveSummaryData(overview, start, end, generatedAt),
-                        executiveSummaryStyle()),
-                // The cross-tab reuses the matrix export's own arrangement, so
-                // the Pack's sheet is the standalone matrix report with the same
-                // landscape/fit-to-width layout.
-                ExportWorkbook.sheet(SHEET_MATRIX,
                         matrixExportService.matrixData(matrix, null, start, end),
-                        HodReportStyles.matrix()),
-                // Likewise the threshold report, so the Pack can never rank a
-                // student differently from the report a HOD already trusts.
-                ExportWorkbook.sheet(SHEET_LOW_ATTENDANCE,
                         reportExportService.lowData(low, start, end),
-                        HodReportStyles.lowAttendance()),
-                ExportWorkbook.sheet(SHEET_SUBJECT_SUMMARY,
                         subjectSummaryData(overview, start, end, generatedAt),
-                        HodReportStyles.overview()),
-                ExportWorkbook.sheet(SHEET_STUDENT_SUMMARY,
-                        studentSummaryData(matrix, start, end, generatedAt),
-                        studentSummaryStyle()));
+                        studentSummaryData(matrix, start, end, generatedAt)),
+                contextSegment(matrix.getContext()));
+    }
 
-        byte[] bytes = excelGenerator.generateWorkbook(new ExportWorkbook(sheets));
-        return new ExportedPack(bytes,
-                HodExportFileNames.build("ContextPack", contextSegment(matrix.getContext()),
-                        null, ExportFormat.XLSX, startDate, endDate));
+    /**
+     * The five reports, in the one order the Pack prints them in.
+     *
+     * <p>Phase 4C.3: extracted from {@link #export} so the workbook and the PDF are
+     * built from the same objects in the same sequence. A future sixth report cannot
+     * be added to one format only, because both read this list.</p>
+     *
+     * @param sectionData    the five reports, in {@link #SHEET_ORDER}
+     * @param contextSegment the resolved context, for the deterministic file name
+     */
+    private record Loaded(List<ExportData> sectionData, String contextSegment) {
+
+        /**
+         * The report for a named section.
+         *
+         * <p>Looked up by the section's own published name rather than by
+         * position, so reordering the load can never silently pair a report with
+         * another one's formatting. A name that is not present is a programming
+         * error, and is reported as one rather than producing a mislabelled
+         * deliverable.</p>
+         */
+        ExportData section(String name) {
+            for (ExportData data : sectionData) {
+                if (name.equals(data.sheetName())) {
+                    return data;
+                }
+            }
+            throw new IllegalStateException(
+                    "The Context Pack has no section named '" + name + "'");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

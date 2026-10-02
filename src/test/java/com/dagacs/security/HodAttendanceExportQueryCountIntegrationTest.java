@@ -509,6 +509,89 @@ class HodAttendanceExportQueryCountIntegrationTest {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 4C.3 - the PDF Context Pack
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("Phase 4C.3: the PDF Context Pack costs the same queries as the workbook")
+    void contextPackPdfCostsWhatTheWorkbookCosts() throws Exception {
+        // The PDF is a presentation layer over the same three calls, so it must
+        // not be a second, more expensive data path. A per-section re-fetch, or a
+        // fetch inside the counting pass, would show up here as a difference.
+        World w = world();
+        String jwt = token();
+        grow(w, LARGE_POPULATION);
+
+        long xlsx = countQueriesFor(jwt, exportUrl(w, "context-pack", Format.xlsx));
+        long pdf = countQueriesFor(jwt, exportUrl(w, "context-pack", Format.pdf));
+
+        assertEquals(xlsx, pdf,
+                "The Context Pack PDF must reuse the workbook's data path. The "
+                        + "workbook cost " + xlsx + " queries and the PDF cost " + pdf
+                        + "; a difference is a second aggregation, which is exactly "
+                        + "what would let the two files disagree.");
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: the PDF Context Pack issues the same queries for 2 and for 60")
+    void contextPackPdfIsNotPerStudent() throws Exception {
+        // The direct N+1 guard, applied to the new format. The PDF renders five
+        // sections and merges them, so a per-section or per-page fetch is exactly
+        // the kind of regression that would otherwise hide.
+        World w = world();
+        String jwt = token();
+
+        long small = countQueriesFor(jwt, exportUrl(w, "context-pack", Format.pdf));
+        grow(w, LARGE_POPULATION);
+        long large = countQueriesFor(jwt, exportUrl(w, "context-pack", Format.pdf));
+
+        assertEquals(LARGE_POPULATION, w.students().size(),
+                "the fixture must really have grown");
+        assertEquals(small, large,
+                "The Context Pack PDF must aggregate with a fixed set of queries. It "
+                        + "used " + small + " for " + SMALL_POPULATION + " students and "
+                        + large + " for " + LARGE_POPULATION + ", which is the "
+                        + "signature of an N+1.");
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: the PDF Context Pack costs no more than the reports it combines")
+    void contextPackPdfCostsNoMoreThanItsSources() throws Exception {
+        // The strongest form of the reuse claim, for the new format: five sections
+        // must not cost more than the three canonical reports they are made from.
+        World w = world();
+        String jwt = token();
+        grow(w, LARGE_POPULATION);
+
+        callOk(jwt, exportUrl(w, "context-pack", Format.pdf));
+
+        long pack = measure(jwt, exportUrl(w, "context-pack", Format.pdf));
+        long combined = measure(jwt, exportUrl(w, "overview", Format.xlsx))
+                + measure(jwt, exportUrl(w, "matrix", Format.xlsx))
+                + measure(jwt, exportUrl(w, "low", Format.xlsx));
+
+        assertTrue(pack <= combined,
+                "The Context Pack PDF must reuse the reports it combines. It cost "
+                        + pack + " queries while its three sources cost " + combined
+                        + "; a per-section reload would show up here as extra cost.");
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: the PDF Context Pack stays within a bounded query count")
+    void contextPackPdfHasAnAbsoluteCeiling() throws Exception {
+        World w = world();
+        String jwt = token();
+        grow(w, 30);
+
+        long count = countQueriesFor(jwt, exportUrl(w, "context-pack", Format.pdf));
+        // The same ceiling the workbook already proved: five sections over three
+        // reports is a fixed, small set of aggregates, not a per-row walk.
+        assertTrue(count > 0 && count <= 70,
+                "The Context Pack PDF used " + count + " queries for one export; it "
+                        + "must be a fixed, small set of aggregates.");
+    }
+
     @Test
     @DisplayName("every export costs a bounded number of queries, not a per-row budget")
     void exportsHaveAnAbsoluteCeiling() throws Exception {

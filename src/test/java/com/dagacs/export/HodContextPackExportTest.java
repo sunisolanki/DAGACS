@@ -93,14 +93,16 @@ class HodContextPackExportTest {
         lenient().when(hodResolver.resolve()).thenReturn(hod);
         header = new HodExportHeader(new ReportBrandingProperties(), hodResolver);
 
+        PdfReportGenerator pdfGenerator = new PdfReportGenerator();
         packService = new HodContextPackExportService(
                 attendanceReportService,
                 new HodAttendanceMatrixExportService(attendanceReportService, header,
-                        excelGenerator, new PdfReportGenerator()),
+                        excelGenerator, pdfGenerator),
                 new HodAttendanceReportExportService(attendanceReportService, header,
-                        excelGenerator, new PdfReportGenerator()),
+                        excelGenerator, pdfGenerator),
                 header,
-                excelGenerator);
+                excelGenerator,
+                new PdfSectionedReportGenerator(pdfGenerator));
     }
 
     private static HodAcademicSelection selection() {
@@ -842,7 +844,7 @@ private void stubOverviewAndLow() {
                     .getLowAttendance(any(), any(), any());
         }
 
-@Test
+        @Test
         @DisplayName("the pack owns no threshold of its own")
         void thresholdComesFromTheData() throws IOException {
             stubAll(true);
@@ -851,6 +853,25 @@ private void stubOverviewAndLow() {
                 assertTrue(meta.stream().anyMatch(l -> l.startsWith("Below 75.00%:")),
                         "the threshold is printed from the DTO, not re-declared");
             }
+        }
+
+        @Test
+        @DisplayName("Phase 4C.3: the PDF pack loads each canonical report exactly once too")
+        void pdfPackCostsTheSameThreeCalls() {
+            // The PDF is a presentation layer over the same three calls, not a
+            // second data path. If the merge or the counting pass ever reached the
+            // service, this is where it would show.
+            stubAll(true);
+            packService.exportPdf(selection(),
+                    java.time.LocalDate.parse(START), java.time.LocalDate.parse(END));
+
+            verify(attendanceReportService, org.mockito.Mockito.times(1))
+                    .getOverview(any(), any(), any());
+            verify(attendanceReportService, org.mockito.Mockito.times(1))
+                    .getMatrix(any(), any(), any(), any(), anyInt(), anyInt(),
+                            anyString(), anyString());
+            verify(attendanceReportService, org.mockito.Mockito.times(1))
+                    .getLowAttendance(any(), any(), any());
         }
     }
 }

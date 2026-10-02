@@ -39,6 +39,14 @@ import java.util.List;
  * <p>The footer is never attached unless a report asks for it: see
  * {@link PdfStyleOptions#pageFooter()}, whose default is {@code false} precisely
  * so existing Teacher and M7.2 documents are unaffected.</p>
+ *
+ * <h3>Phase 4C.3 - numbering inside a merged document</h3>
+ * <p>OpenPDF 1.3.39 cannot give one {@code Document} two page sizes, so a
+ * multi-section deliverable is rendered one section at a time and the pages are
+ * merged. Each rendering is handed the number of pages the document already had,
+ * which this class adds to its own page number. The extra constructor parameter
+ * is additive: the original four-argument constructor is unchanged and supplies
+ * {@code 0}, so every pre-4C.3 document still numbers itself from 1.</p>
  */
 final class PdfPageFooter extends PdfPageEventHelper {
 
@@ -70,12 +78,27 @@ final class PdfPageFooter extends PdfPageEventHelper {
     private final boolean showContext;
     private final Integer totalPages;
 
+    /**
+     * Phase 4C.3: how many pages already precede this rendering, so the first
+     * page drawn here can be numbered as part of a larger document.
+     *
+     * <p>Zero for every pre-4C.3 caller, which is why the constructor above is
+     * retained unchanged and delegates here.</p>
+     */
+    private final int pageNumberOffset;
+
     PdfPageFooter(String reportLabel, boolean showPageNumbers, boolean showContext,
                   Integer totalPages) {
+        this(reportLabel, showPageNumbers, showContext, totalPages, 0);
+    }
+
+    PdfPageFooter(String reportLabel, boolean showPageNumbers, boolean showContext,
+                  Integer totalPages, int pageNumberOffset) {
         this.reportLabel = reportLabel;
         this.showPageNumbers = showPageNumbers;
         this.showContext = showContext;
         this.totalPages = totalPages;
+        this.pageNumberOffset = Math.max(pageNumberOffset, 0);
     }
 
     /**
@@ -120,13 +143,20 @@ final class PdfPageFooter extends PdfPageEventHelper {
      * <p>A single-page report still reads {@code "Page 1 of 1"} rather than being
      * left blank, because a reader who sees one page and no footer cannot tell
      * whether the document was truncated.</p>
+     *
+     * <p><b>Phase 4C.3.</b> {@code pageNumberOffset} is the number of pages the
+     * whole document already had before this rendering. It is added to the
+     * page's own number so the last page of a merged section reads
+     * {@code "Page 8 of 8"}, never {@code "Page 3 of 3"}. It is zero for every
+     * single-report caller, so their output is byte-for-byte what it always was.</p>
      */
     private String pageLabel(int page) {
+        int documentPage = page + pageNumberOffset;
         if (totalPages == null) {
             // First pass: the total is not known yet.
-            return "Page " + page;
+            return "Page " + documentPage;
         }
-        return "Page " + page + " of " + totalPages;
+        return "Page " + documentPage + " of " + totalPages;
     }
 
     /**

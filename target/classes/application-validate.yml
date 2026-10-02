@@ -1,0 +1,15 @@
+# M9.6 N-A: validate-only release-rehearsal profile.
+#
+# Launched with -Dspring-boot.run.profiles=validate against a production schema
+# REPLICA/snapshot, this proves Hibernate's entity mapping matches the live DDL
+# WITHOUT writing to the database (ddl-auto: validate only reads metadata).
+# It intentionally is NOT the default or the prod profile: it must never be the
+# DDL strategy of a running server, only a drift-check gate in the release
+# rehearsal sequence.
+#
+# NOTE: Hibernate validates before any ApplicationRunner migration executes, so
+# this gate is meaningful only against a replica that has already been migrated.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate

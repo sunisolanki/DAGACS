@@ -50,6 +50,22 @@ import java.util.Set;
  * formula injection is <b>not</b> applied here - it would print a stray
  * character into a PDF. No markup is ever interpreted, because no markup
  * language is involved.</p>
+ *
+ * <h3>Phase 4C.3 - one section of a larger document</h3>
+ * <p>The extra {@link #generate(ExportData, PdfStyleOptions, String, int)} overload
+ * lets one rendering be a numbered part of a bigger file. It changes the footer's
+ * label and the page-number offset and nothing else: the table, the headers, the
+ * values, the fonts, the margins and the page size are produced by exactly the code
+ * below, which is why a single-report render is unchanged.</p>
+ *
+ * <p><b>One document is still one page size.</b> OpenPDF 1.3.39 fixes a page's
+ * MediaBox when the page object is created, from the size that is live at that
+ * moment, and it only refreshes that size from the pending one at page
+ * initialisation. A single {@code Document} therefore cannot emit a portrait page
+ * and then a landscape one. Mixed orientation is achieved by rendering each part
+ * with this unchanged generator - which already sizes each document from
+ * {@link ExportData#landscape()} - and merging the pages with
+ * {@link PdfDocumentMerger}, which preserves each page's own box.</p>
  */
 @Component
 public class PdfReportGenerator {
@@ -93,6 +109,30 @@ public class PdfReportGenerator {
      * above reaches it with the defaults that reproduce the historical layout.</p>
      */
     public byte[] generate(ExportData data, PdfStyleOptions options) {
+        return generate(data, options, data.title(), 0);
+    }
+
+    /**
+     * Phase 4C.3: renders one part of a larger document.
+     *
+     * <p>Adds exactly two things the single-report path cannot know, and nothing
+     * else:</p>
+     * <ul>
+     *   <li>{@code footerLabel} - what the running footer names. A single report's
+     *       footer names the report; a sectioned deliverable must name the
+     *       <i>section</i> and the deliverable it belongs to.</li>
+     *   <li>{@code pageNumberOffset} - how many pages the document already had, so
+     *       this part is numbered inside the whole rather than from 1.</li>
+     * </ul>
+     *
+     * <p><b>Strictly additive.</b> The two-argument overload delegates with
+     * {@code data.title()} and {@code 0}, so every existing caller - the HOD
+     * attendance PDFs, and through {@code ReportExportService} the M7.2 department
+     * reports and every Teacher export - produces byte-identical output.
+     * {@code PdfFormattingTest} asserts exactly that.</p>
+     */
+    public byte[] generate(ExportData data, PdfStyleOptions options, String footerLabel,
+                           int pageNumberOffset) {
         boolean wide = options.hasLandscapeOverride()
                 ? options.landscapeOverride()
                 : data.landscape();
@@ -111,9 +151,10 @@ public class PdfReportGenerator {
             if (options.pageFooter()) {
                 // The footer lives in the margin, so it can never alter how the
                 // body paginates.
-                writer.setPageEvent(new PdfPageFooter(data.title(),
+                writer.setPageEvent(new PdfPageFooter(
+                        footerLabel == null ? data.title() : footerLabel,
                         options.pageNumbers(), options.footerContext(),
-                        options.totalPages()));
+                        options.totalPages(), pageNumberOffset));
             }
             document.open();
 

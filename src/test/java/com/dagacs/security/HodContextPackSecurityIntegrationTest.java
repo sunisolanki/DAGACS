@@ -76,6 +76,15 @@ class HodContextPackSecurityIntegrationTest {
     private static final String HOD_PASSWORD = "Hod@123";
     private static final String PACK = "/api/hod/attendance/context-pack/export.xlsx";
 
+    /**
+     * Phase 4C.3: the PDF deliverable.
+     *
+     * <p>Every rejection asserted for the workbook is asserted for the PDF too,
+     * which is the point: the PDF must inherit Phase 4B's authorization rather than
+     * define its own, so the probe has to be run against both routes.</p>
+     */
+    private static final String PACK_PDF = "/api/hod/attendance/context-pack/export.pdf";
+
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private EntityManager entityManager;
@@ -418,5 +427,121 @@ class HodContextPackSecurityIntegrationTest {
         assertTrue(result.getResponse().getHeader("Content-Disposition")
                         .contains("2026-01-01"),
                 "The file name must describe the range that was actually applied");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 4C.3 - the PDF Pack inherits exactly these rules
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("Phase 4C.3: a HOD can export the PDF Pack for their own context")
+    void ownContextIsExportableAsPdf() throws Exception {
+        World w = world();
+        String token = token();
+
+        MvcResult result = mockMvc.perform(get(PACK_PDF + contextQuery(w))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        byte[] bytes = result.getResponse().getContentAsByteArray();
+        assertTrue(bytes.length > 0, "The PDF Pack must not be an empty file");
+        assertEquals('%', (char) bytes[0], "A real PDF container");
+        assertEquals('P', (char) bytes[1]);
+        assertEquals('D', (char) bytes[2]);
+        assertEquals('F', (char) bytes[3]);
+
+        String disposition = result.getResponse().getHeader("Content-Disposition");
+        assertNotNull(disposition, "The PDF Pack must be an attachment");
+        assertTrue(disposition.contains("attachment"));
+        assertTrue(disposition.contains("filename="));
+        assertTrue(disposition.contains("ContextPack"),
+                "The file name must identify the deliverable: " + disposition);
+        assertTrue(disposition.contains(".pdf"), disposition);
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: an unauthenticated PDF Pack request is 401, never data")
+    void unauthenticatedPdfIsRejected() throws Exception {
+        World w = world();
+        assertEquals(401, statusOf(PACK_PDF + contextQuery(w), null),
+                "The PDF Pack must never be produced without a token");
+        // The workbook route is the control: the PDF must not be stricter, and
+        // must not be looser.
+        assertEquals(401, statusOf(PACK + contextQuery(w), null));
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: a forged token cannot export the PDF Pack")
+    void bogusTokenCannotExportPdf() throws Exception {
+        World w = world();
+        assertEquals(401, statusOf(PACK_PDF + contextQuery(w), "not-a-real-token"),
+                "A forged token must not produce a PDF pack");
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: cross-context access to the PDF Pack is rejected")
+    void crossContextPdfIsRejected() throws Exception {
+        World mine = world();
+        World other = otherDepartment();
+        String token = token();
+
+        // A whole other department: the widest thing the Pack can be asked for.
+        assertEquals(403, statusOf(PACK_PDF + contextQuery(other), token),
+                "Another department must never be downloadable as one PDF pack");
+
+        // A mixed context: the HOD's own program/session/semester with a section
+        // belonging to a different department.
+        String mixed = "?academicSessionId=" + mine.session.getId()
+                + "&programId=" + mine.program.getId()
+                + "&semesterId=" + mine.semester.getId()
+                + "&sectionId=" + other.section.getId();
+        assertEquals(403, statusOf(PACK_PDF + mixed, token),
+                "A mixed-department context must never produce a PDF pack");
+
+        // A section that does not belong to the chosen batch.
+        String wrongSection = "?academicSessionId=" + mine.session.getId()
+                + "&programId=" + mine.program.getId()
+                + "&semesterId=" + mine.semester.getId()
+                + "&sectionId=" + other.section.getId();
+        assertEquals(403, statusOf(PACK_PDF + wrongSection, token),
+                "A section outside the context must never produce a PDF pack");
+
+        // The HOD's own context still works, so the 403s above are isolation and
+        // not a broken endpoint.
+        assertEquals(200, statusOf(PACK_PDF + contextQuery(mine), token));
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: an incomplete context or inverted range is 400 for the PDF")
+    void malformedRequestsAreRejectedForPdf() throws Exception {
+        World w = world();
+        String token = token();
+
+        assertEquals(400,
+                statusOf(PACK_PDF + "?academicSessionId=" + w.session.getId(), token),
+                "An incomplete context must be refused, not widened");
+        assertEquals(400,
+                statusOf(PACK_PDF + contextQuery(w)
+                        + "&startDate=2026-01-31&endDate=2026-01-01", token),
+                "An inverted range must be refused before any file is built");
+    }
+
+    @Test
+    @DisplayName("Phase 4C.3: the PDF Pack honours the applied date range")
+    void pdfPackHonoursTheDateRange() throws Exception {
+        World w = world();
+        String token = token();
+
+        MvcResult result = mockMvc.perform(get(PACK_PDF + contextQuery(w)
+                        + "&startDate=2026-01-01&endDate=2026-01-31")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertTrue(result.getResponse().getContentAsByteArray().length > 0);
+        assertTrue(result.getResponse().getHeader("Content-Disposition")
+                        .contains("2026-01-01"),
+                "The PDF file name must describe the range that was applied");
     }
 }

@@ -436,9 +436,8 @@ public class HodAttendanceReportController {
      * unchanged. A Pack is also strictly narrower than any Phase 4A endpoint: it
      * cannot reach one student's report, only the whole authorized context.</p>
      *
-     * <p>XLSX only for now. A multi-sheet PDF needs pagination and print chrome,
-     * which is Phase 4C's scope, and shipping one before that exists would mean
-     * designing it twice.</p>
+     * <p>XLSX is the established format. Phase 4C.3 adds the same deliverable as
+     * one PDF, printed from the identical data.</p>
      */
     @GetMapping("/context-pack/export.xlsx")
     public ResponseEntity<byte[]> exportContextPack(
@@ -455,6 +454,38 @@ public class HodAttendanceReportController {
                 selection(academicSessionId, programId, semesterId, sectionId),
                 startDate, endDate);
         return attachment(pack.bytes(), XLSX_MEDIA_TYPE, pack.fileName());
+    }
+
+    /**
+     * The same Context Pack as one PDF: the same five reports, in the same order,
+     * with a continuous page sequence.
+     *
+     * <p><b>Phase 4C.3.</b> Not a second data path: it takes the identical
+     * academic-selection parameters, runs the identical
+     * {@link InvalidDateRangeException} check, and calls the same
+     * {@code load} the spreadsheet does - so the PDF costs the same three canonical
+     * service calls, is confined to the same department and context, and is built
+     * from the very same {@code ExportData} instances. It is therefore impossible
+     * for the two files to disagree about a single attendance number.</p>
+     *
+     * <p>The cross-tab section is landscape and the other four are portrait,
+     * inside one file, with {@code Page X of Y} counted across all of them.</p>
+     */
+    @GetMapping("/context-pack/export.pdf")
+    public ResponseEntity<byte[]> exportContextPackPdf(
+            @RequestParam(name = "academicSessionId", required = false) Long academicSessionId,
+            @RequestParam(name = "programId", required = false) Long programId,
+            @RequestParam(name = "semesterId", required = false) Long semesterId,
+            @RequestParam(name = "sectionId", required = false) Long sectionId,
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        validateDateRange(startDate, endDate);
+        HodContextPackExportService.ExportedPack pack = contextPackExportService.exportPdf(
+                selection(academicSessionId, programId, semesterId, sectionId),
+                startDate, endDate);
+        return attachment(pack.bytes(), PDF_MEDIA_TYPE, pack.fileName());
     }
 
     private static ResponseEntity<byte[]> attachment(byte[] body, String mediaType, String fileName) {
