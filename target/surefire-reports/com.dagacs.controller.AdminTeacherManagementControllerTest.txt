@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.dagacs.controller.AdminTeacherManagementControllerTest
--------------------------------------------------------------------------------
-Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.090 s -- in com.dagacs.controller.AdminTeacherManagementControllerTest
